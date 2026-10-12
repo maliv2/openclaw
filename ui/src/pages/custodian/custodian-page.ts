@@ -8,7 +8,7 @@ export function renderCustodianRoute(data: CustodianRouteData | undefined) {
     return nothing;
   }
   return html`<openclaw-custodian-page
-    .onboarding=${data?.onboarding === true}
-    .newAgentIntent=${data?.intent === "new-agent"}
+    .onboarding=${data.onboarding}
+    .newAgentIntent=${data.intent === "new-agent"}
   ></openclaw-custodian-page>`;
 }

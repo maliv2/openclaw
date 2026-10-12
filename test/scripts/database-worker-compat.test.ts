@@ -801,6 +801,59 @@ it("classifies a shared kernel with exclusively worker callers as worker-owned",
 });
 
 it.each([
+  {
+    entryFile: "src/state/user-profiles.ts",
+    entry: "ensureProfileForTailscaleIdentity",
+    workerFile: "src/state/user-profiles.worker.ts",
+    kernelFile: "src/state/user-profile-mutation.ts",
+    kernel: "runUserProfileWriteTransaction",
+    source: `import { runUserProfileWriteTransaction } from './user-profile-mutation.js';
+      export function ensureProfileForTailscaleIdentity() { return runUserProfileWriteTransaction(); }`,
+    kernelSource: `export function runUserProfileWriteTransaction() { return executeSqliteQuerySync(query); }`,
+  },
+  {
+    entryFile: "src/state/user-profile-github-identity.ts",
+    entry: "readUserProfileGitHubCommand",
+    workerFile: "src/state/user-profile-read.worker.ts",
+    kernelFile: "src/state/user-profile-github-identity.ts",
+    kernel: "selectStoredGitHubIdentities",
+    source: `function selectStoredGitHubIdentities() { return executeSqliteQuerySync(query); }
+      function resolveCachedGitHubIdentityInDatabase() { return selectStoredGitHubIdentities(); }
+      export function readUserProfileGitHubCommand() { return resolveCachedGitHubIdentityInDatabase(); }`,
+    kernelSource: undefined,
+  },
+])("proves the profile worker chain through $entry", (fixture) => {
+  const sources = new Map([
+    [fixture.entryFile, fixture.source],
+    [
+      fixture.workerFile,
+      `import { ${fixture.entry} } from './${fixture.entryFile.split("/").at(-1)!.replace(".ts", ".js")}';
+        export const handlers = { run: () => ${fixture.entry}() };`,
+    ],
+  ]);
+  if (fixture.kernelSource) {
+    sources.set(fixture.kernelFile, fixture.kernelSource);
+  }
+  const inspect = () =>
+    inspectDatabaseWorkerBoundaries(
+      process.cwd(),
+      sources,
+      () => false,
+      (file) => (file === fixture.workerFile ? "W" : undefined),
+    );
+  expect(inspect().nonRuntimeOperations.get(fixture.kernelFile)?.get(fixture.kernel)).toBe("W");
+
+  sources.set(
+    "src/gateway/handler.ts",
+    `import { ${fixture.entry} } from '../state/${fixture.entryFile.split("/").at(-1)!.replace(".ts", ".js")}';
+      export function handle() { return ${fixture.entry}(); }`,
+  );
+  expect(inspect().nonRuntimeOperations.get(fixture.kernelFile)?.has(fixture.kernel)).not.toBe(
+    true,
+  );
+});
+
+it.each([
   `export const handlers = { run: () => writeCurrentStateSchemaMetadata() };`,
   `export function createHandler() { return () => writeCurrentStateSchemaMetadata(); }`,
 ])("retains callback execution inside a reviewed worker-only module: %s", (body) => {

@@ -13,6 +13,7 @@ import {
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { listSystemPresence, upsertPresence } from "../infra/system-presence.js";
 import { sessionChanges } from "../sessions/session-row-changes.js";
+import { prepareUserProfileCatalog } from "../state/user-profile-list.js";
 import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { createTestGatewayScheduler } from "../test-utils/gateway-scheduler-clock.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
@@ -353,6 +354,10 @@ describe("gateway connection state", () => {
           updatedAt: 1,
         };
         state.clients.add(peer.client);
+      }
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      for (const peer of [requester, recipient]) {
+        prepareGatewayRecipientProfile(peer.client);
       }
       const recipientOnline = async () => {
         let online: boolean | undefined;

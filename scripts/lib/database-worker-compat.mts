@@ -166,7 +166,12 @@ const nonRuntimeCandidates = new Map<string, readonly string[]>([
   ],
   [
     "src/state/user-profiles.ts",
-    ["ensureProfileForEmailWithInitialName", "ensureProfileForEmail", "ensureGatewayOwnerProfile"],
+    [
+      "ensureProfileForEmailWithInitialName",
+      "ensureProfileForEmail",
+      "ensureGatewayOwnerProfile",
+      "ensureProfileForTailscaleIdentity",
+    ],
   ],
   [
     "src/state/user-profile-list.ts",
@@ -178,6 +183,8 @@ const nonRuntimeCandidates = new Map<string, readonly string[]>([
       "selectStoredGitHubIdentities",
       "selectProfileAccessEntries",
       "selectUserProfileGitHubIdentities",
+      "resolveCachedGitHubIdentityInDatabase",
+      "readUserProfileGitHubCommand",
     ],
   ],
 ]);

@@ -3752,8 +3752,13 @@ an in-process write receipt changes. Sibling handles and workers share that rece
 blocked or failed checkpoints keep retrying when a reader may have released.
 Connections without a known write receipt continue checkpointing on every tick.
 Page reclamation and blocking checkpoint modes keep their zero-timeout scope.
-Existing worker-local maintenance and synchronous offline/close checkpoints retain
-their owners; durability, schemas, retention, and update behavior are unchanged.
+While an offline maintenance scope retains a shared-state worker, its scheduled
+WAL work pauses so Doctor and update-recovery captures keep stable source bytes.
+Explicitly admitted maintenance remains available. The final maintenance client
+release resumes the same worker's normal ten-second checkpoint cadence; overlapping
+maintenance clients keep it paused until all release. Synchronous offline and close
+checkpoints retain their owners; durability, schemas, retention, and update behavior
+are unchanged.
 
 Worker authority requests retain their unbounded live-owner wait unless the caller
 explicitly supplies a `deadlineMs` budget. Only cron's runtime mutation preparation

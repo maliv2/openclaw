@@ -50,6 +50,7 @@ import {
 import {
   isConfiguredAgentDatabaseTarget,
   resolveAllAgentSessionStoreTargetsSync,
+  resolveConfiguredAgentDatabaseCandidatePaths,
   resolveConfiguredAgentDatabaseTargets,
 } from "./targets.js";
 
@@ -263,7 +264,9 @@ export async function runSessionStartupMigration(params: {
   const registeredDatabases = new Set(
     listOpenClawRegisteredAgentDatabases({ env }).map((entry) => `${entry.agentId}\0${entry.path}`),
   );
-  const configuredTargets = resolveConfiguredAgentDatabaseTargets(params.cfg, { env });
+  const configuredTargets = resolveConfiguredAgentDatabaseCandidatePaths(params.cfg, { env }).map(
+    (pathname) => ({ path: pathname }),
+  );
   const tasks = targets.map((target) => async () => {
     params.assertCurrent?.();
     const options = toDatabaseOptions(resolveSqliteReadScope({ ...target, env }));

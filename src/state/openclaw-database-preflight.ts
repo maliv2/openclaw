@@ -6,7 +6,6 @@ import { resolveStateDir } from "../config/paths.js";
 import {
   isConfiguredAgentDatabaseTarget,
   resolveConfiguredAgentDatabaseCandidatePaths,
-  resolveConfiguredAgentDatabaseTargets,
 } from "../config/sessions/targets.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -309,7 +308,7 @@ export async function preflightOpenClawDatabaseSchemas(
   if (options.scope === "state") {
     return result;
   }
-  const { candidates, isRetainedPath, failures, preparedDiscovery } =
+  const { candidates, configuredTargets, isRetainedPath, failures, preparedDiscovery } =
     collectAgentDatabasePreflightTargets({
       ...options,
       registeredDatabases,
@@ -325,20 +324,23 @@ export async function preflightOpenClawDatabaseSchemas(
   for (const failure of failures) {
     result.indeterminate.push({ kind: "agent", ...failure });
   }
-  const configuredTargets =
+  const admissionTargets =
     admissionConfig &&
     (options.requireStartupMigrationReadiness || options.reuseStartupSchemaPreparation)
-      ? resolveConfiguredAgentDatabaseTargets(admissionConfig, {
-          env: options.env,
-          registeredDatabases,
-        })
+      ? [
+          ...configuredTargets,
+          ...(
+            options.configuredAgentDatabaseCandidatePaths ??
+            resolveConfiguredAgentDatabaseCandidatePaths(admissionConfig, { env: options.env })
+          ).map((pathname) => ({ path: pathname })),
+        ]
       : undefined;
   const skipped = new Set<string>();
   const inspectionTargets = candidates
     .filter((row) => {
       if (
-        !configuredTargets ||
-        isConfiguredAgentDatabaseTarget(configuredTargets, row.agentId, row.path)
+        !admissionTargets ||
+        isConfiguredAgentDatabaseTarget(admissionTargets, row.agentId, row.path)
       ) {
         return true;
       }

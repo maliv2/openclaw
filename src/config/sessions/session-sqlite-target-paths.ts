@@ -2,7 +2,16 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { normalizeAgentId } from "@openclaw/normalization-core/agent-id";
 import { hasErrnoCode } from "../../infra/errno.js";
-import { resolveConcreteSessionStorePath } from "./paths.js";
+
+export const MULTI_STORE_PATH_SENTINEL = "(multiple)";
+
+export function resolveConcreteSessionStorePath(storePath: string | undefined): string | undefined {
+  const trimmed = storePath?.trim();
+  if (!trimmed || trimmed === MULTI_STORE_PATH_SENTINEL || trimmed.includes("{agentId}")) {
+    return undefined;
+  }
+  return trimmed;
+}
 
 /** Resolves only the legacy unsuffixed target, without reading ownership state. */
 export function resolveUnsuffixedSqliteTargetFromSessionStorePath(storePath: string): {

@@ -14,12 +14,10 @@ import {
   resolveOpenClawRegisteredAgentDatabasePath,
 } from "./openclaw-state-db.paths.js";
 
-export type AgentDatabasePathRepairReport = { repaired: number; warnings: string[] };
-
 /** The caller retains shared-state write admission through this synchronous repair. */
 export function repairOpenClawAgentDatabasePaths(
   database: Pick<OpenClawStateDatabase, "db" | "path">,
-): AgentDatabasePathRepairReport {
+): { repaired: number; warnings: string[] } {
   const { db, path: pathname } = database;
   assertOpenClawStateDatabaseForMaintenance(db, { pathname });
   const active = readActiveUpdateRun(db);

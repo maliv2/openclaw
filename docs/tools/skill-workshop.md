@@ -52,30 +52,25 @@ it started with.
 
 ## Undo
 
-When a background run changes a skill, OpenClaw posts one line to the
-conversation that triggered it:
+When a background run changes a skill, OpenClaw adds a notice to the
+originating session's transcript:
 
 ```text
 💾 Learned: updated `deploy-staging` (tightened the rollback step). Say "undo" to revert this skill change.
 ```
 
-Reply "undo" and the agent restores the previous version with `skill_workshop`.
-Nothing is posted when the review changed nothing. Channel-less Control UI
-sessions show the change as a compact **Learned** card; each skill name in it
-opens that skill in the Workshop.
+The Control UI chat shows a compact **Learned** row with an **Undo** button
+for every session, including channel sessions. Each skill name opens that skill
+in the Workshop. Channels get no message, and nothing is shown when the review
+changed nothing.
 
-To revert everything one review changed without asking the agent:
+Say "undo" in the originating conversation, including on a channel, and the
+agent restores the previous version with `skill_workshop`.
 
-- Press **Undo** on the notice. Channels with buttons render it under the
-  line; plain-text channels show the command to copy instead.
-- Press **Undo** on the Control UI **Learned** card.
-- Send `/learn undo <id>`, where `<id>` is the review id in the notice's
-  command.
-
-Each restores the version saved before the review's first change of a skill
-and archives skills the review created. Pressing it again reports that the
-change was already undone. The chat command needs the owner, plus
-`operator.admin` from Gateway clients.
+To revert everything one review changed without asking the agent, press
+**Undo** on the Control UI **Learned** row. It restores the version saved before
+the review's first change of a skill and archives skills the review created.
+Pressing it again reports that the change was already undone.
 
 You can also undo one skill from the Control UI (**Undo** on the skill's latest
 change or in its History tab) or the CLI:
@@ -133,10 +128,6 @@ durable to learn, it changes nothing.
 when `skill_workshop` is unavailable, for example in a sandboxed session or
 when tool policy hides the tool.
 
-`/learn undo <id>` is the one exception: with a review id, it reverts that
-background review without a model turn. See [Undo](#undo). Any other text after
-`/learn` is a request.
-
 ## Agent tool
 
 The built-in `skill_workshop` tool is how every learned-skill change is made.
@@ -155,7 +146,7 @@ It is part of `tools.profile: "coding"`; with a stricter policy, add it to
 | `restore`     | `name`, optional `version`                           | Restores the newest saved version, or the one named                      |
 
 Every mutating action accepts `reason`, one short line that appears in the
-change feed and the chat notice. Every change saves the previous version first.
+change feed and the Control UI notice. Every change saves the previous version first.
 
 Writes are validated before they land:
 
@@ -284,7 +275,7 @@ files you need from them by hand; OpenClaw does not restore them.
 | Nothing is ever learned            | `skills.workshop.autonomous.mode` is `auto`, the conversation is eligible, and tool policy allows `skill_workshop`. See [Self-learning](/tools/self-learning#troubleshooting). |
 | Agent cannot call `skill_workshop` | Sandboxed runs do not get the tool. Use a non-sandboxed session or the CLI. Otherwise add the tool to `tools.allow` or `tools.alsoAllow`.                                      |
 | A write is refused                 | The error names the fix: rename the skill, correct the frontmatter, shorten the description or `SKILL.md`, or remove the flagged line.                                         |
-| An unwanted change was made        | Press **Undo** on the notice, say "undo", send `/learn undo <id>`, or run `openclaw skills workshop restore <name>`.                                                           |
+| An unwanted change was made        | Press **Undo** on the Control UI **Learned** row, say "undo" in the originating conversation, or run `openclaw skills workshop restore <name>`.                                |
 | A skill was archived unexpectedly  | Unused-skill cleanup archives skills with no activity for 30 days. Run `openclaw skills workshop restore <name>`.                                                              |
 
 In `auto` mode, `openclaw doctor` runs the `core/doctor/skill-workshop-tool-policy`

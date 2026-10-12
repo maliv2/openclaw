@@ -16,7 +16,7 @@ const UNDO_RUN_PREFIX = "skill-workshop-undo:";
 // The change feed retains at most this many rows per agent, so one page holds a whole run.
 const MAX_RUN_CHANGES = 500;
 
-/** Run id of one background review; `reviewId` is the id `/learn undo` takes. */
+/** Run id of one background review, shared by its notice and undo operation. */
 export function workshopReviewRunId(reviewId: string): string {
   return `${REVIEW_RUN_PREFIX}${reviewId}`;
 }

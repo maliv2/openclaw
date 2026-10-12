@@ -22,8 +22,8 @@ Learning happens in three places:
 - **Unused-skill cleanup** archives learned skills unused for 30 days. See
   [Unused-skill cleanup](/tools/skill-workshop#unused-skill-cleanup).
 
-Every change applies immediately, is announced in the conversation, and can be
-undone. See [Undo](/tools/skill-workshop#undo).
+Every change applies immediately and can be undone. Background review notices
+appear only in the Control UI chat. See [Undo](/tools/skill-workshop#undo).
 
 ## When a review runs
 
@@ -92,22 +92,21 @@ commands, paths, or ids. When nothing durable was learned, it changes nothing.
 
 ## What you see
 
-If the review changed a skill, one line is posted to the conversation that
-triggered it and mirrored into the session transcript:
+If the review changed a skill, its session transcript gets a notice:
 
 ```text
 💾 Learned: updated `deploy-staging` (tightened the rollback step). Say "undo" to revert this skill change.
 ```
 
-Channel-less Control UI sessions show it as a **Learned** row instead: one chip
-per changed skill, each opening that skill in the Skill Workshop, and an
-**Undo** button. Nothing is posted when nothing changed. Slack conversations get
-no notice; the change still appears in the Skill Workshop, where you can undo it.
+The Control UI chat shows it as a **Learned** row for every session, including
+channel sessions: one chip per changed skill, each opening that skill in the
+Skill Workshop, and an **Undo** button. Channels get no message. Nothing is
+shown when nothing changed.
 
-To undo everything the review changed, press **Undo** on the notice (a button
-on channels that render buttons, a copyable `/learn undo <id>` command on
-plain-text ones) or on the Control UI card. You can also reply "undo" and the
-agent restores the previous version. See
+To undo everything the review changed, press **Undo** on the Control UI row.
+You can also say "undo" in the originating conversation, including on a channel,
+and the agent restores the previous version. To undo an individual skill, use
+the Workshop page or `openclaw skills workshop restore <name>`. See
 [Skill Workshop undo](/tools/skill-workshop#undo).
 
 A review stops without changing anything further if you turn learning off, or

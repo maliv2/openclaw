@@ -112,6 +112,7 @@ describe("session sharing policy", () => {
       const cfg = rolePolicyConfig();
       const owner = roleClient("view", "narrow-owner");
       const member = roleClient("view", "narrow-member");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       const ownerId = owner.authenticatedUserProfile?.profileId;
       const memberId = member.authenticatedUserProfile?.profileId;
       if (!ownerId || !memberId) {
@@ -200,6 +201,7 @@ describe("session sharing policy", () => {
       const cfg = rolePolicyConfig(["guest-agent"]);
       const writer = roleClient("write", "foreign-agent-writer");
       const owner = ensureProfileForEmail("foreign-agent-owner@example.test");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       const sessionKey = "agent:main:existing-maintainer-session";
       await upsertSessionEntryCore(
         { agentId: "main", sessionKey },
@@ -406,6 +408,7 @@ describe("session sharing policy", () => {
       const cfg = rolePolicyConfig();
       const writer = roleClient("write", "draft-writer");
       const owner = ensureProfileForEmail("draft-owner@example.test");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
 
       for (const visibility of ["draft", "incognito"] as const) {
         const sessionKey = `agent:main:dashboard:${visibility === "incognito" ? "incognito-" : ""}role-carveout`;
@@ -446,6 +449,7 @@ describe("session sharing policy", () => {
       const creator = roleClient("none", "cron-creator");
       const creatorId = creator.authenticatedUserProfile!.profileId;
       const restricted = roleClient("none", "restricted");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       const restrictedId = restricted.authenticatedUserProfile!.profileId;
       const foreignKey = "agent:main:cron:job-1:run:run-1";
       const ownKey = "agent:main:team-own";
@@ -650,6 +654,7 @@ describe("session sharing policy", () => {
     async (visibility) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const sessionKey = `agent:main:assignment-${visibility}`;
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         await upsertSessionEntryCore(
           { agentId: "main", sessionKey },
           {

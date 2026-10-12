@@ -220,6 +220,7 @@ describe("artifact session authorization", () => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const owner = ensureProfileForEmail("artifact-owner@example.test");
         const viewer = roleClient("view", "artifact-reader");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         const sessionKey = "agent:main:readable-artifacts";
         await upsertSessionEntryCore(
           { agentId: "main", sessionKey },

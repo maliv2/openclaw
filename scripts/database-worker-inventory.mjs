@@ -20,6 +20,10 @@ const primitives = new Map([
 ]);
 const excluded =
   /(?:^|\/)(?:__tests__|__fixtures__|test|tests|test-utils|test-helpers|test-support|test-fixtures|test-harness|fixtures|e2e)(?:\/|$)|(?:^|[/.-])(?:test|spec|e2e|test-support|test-helpers|test-fixtures|test-harness|test-runtime)(?:[.-])/;
+const testSuites = new Set([
+  // Imports Vitest; only server.auth.default-token.test.ts imports this suite.
+  "src/gateway/server.auth.default-token.suite.ts",
+]);
 const reviewed = new Map([
   [
     "src/agents/github-oauth-records.native.ts",
@@ -900,15 +904,18 @@ const reviewedOperations = new Map([
         tier: "W",
         operations: [
           "ensureSkillLibrarySchema",
+          "resolveSkillLibraryActor",
           "requireSelectedSkillLibraryUpload",
+          "selectSkillLibraryOwner",
           "selectSkillLibraryEntries",
+          "selectSkillLibraryEntries.readOwners",
           "selectSkillLibraryRevision",
           "selectSkillLibraryRevisionMetadata",
           "assertSkillLibraryNameAvailable",
           "recordSkillLibraryEvent",
         ],
         evidence:
-          "Library row, revision, upload, and mutation kernels run only through the shared-state reader/writer; the SDK metadata batch remains in selection-read.kernel.ts",
+          "Library actor, owner, row, revision, upload, and mutation kernels run only through the shared-state reader/writer (read.kernel.ts, service.kernel.ts, import.kernel.ts, and store.worker.ts); readOwners is private to the worker list projection. The SDK metadata batch remains in selection-read.kernel.ts.",
       },
     ],
   ],
@@ -2402,6 +2409,7 @@ const workerModules = new Set([
   "src/state/user-background.store.ts", // Background read/write workers; preference validation and profile merge/link/GitHub-sync also run in shared-state workers.
   "src/gateway/worker-environments/local-workspace-store.kernel.ts", // Projection read/write workers and worktree retirement worker only.
   "src/skills/library/import.kernel.ts", // Upload commands execute only in the shared-state writer.
+  "src/skills/library/read.kernel.ts", // Only openclaw-state-read-operation-registry.ts imports this worker operation table.
   "src/skills/library/service.kernel.ts", // Library catalog and revision reads use the shared-state read registry.
   "src/skills/workshop/changes.kernel.ts", // changes.worker.ts owns append/list SQL through the shared-state registry.
   "src/skills/workshop/skill-usage.kernel.ts", // changes.worker.ts owns recordSkillUsageInDatabase; host imports are type-only.
@@ -2792,7 +2800,12 @@ export function inventory(root = defaultRoot, ref = "", staged = false) {
   }
   const sourceFiles = result.stdout
     .split("\0")
-    .filter((file) => /\.(?:ts|tsx|js|mjs|mts|cts|cjs)$/.test(file) && !excluded.test(file));
+    .filter(
+      (file) =>
+        /\.(?:ts|tsx|js|mjs|mts|cts|cjs)$/.test(file) &&
+        !excluded.test(file) &&
+        !testSuites.has(file),
+    );
   const texts = snapshot
     ? loadRatchetSources(root, sourceFiles, ref)
     : new Map(sourceFiles.map((file) => [file, fs.readFileSync(path.join(root, file), "utf8")]));
@@ -2839,7 +2852,7 @@ export function inventory(root = defaultRoot, ref = "", staged = false) {
         ) {
           classification.tier = "T1-compat";
           classification.evidence =
-            "Deprecated SDK compatibility only; no bundled value references outside reviewed compatibility boundaries. Remove at the next Plugin SDK major.";
+            "Deprecated SDK compatibility only; no bundled value references outside reviewed compatibility boundaries. Remove in a later release after stable deprecation.";
         }
         const nonRuntimeTier = compatibility.nonRuntimeOperations.get(file)?.get(call.operation);
         if (

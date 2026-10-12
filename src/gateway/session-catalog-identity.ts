@@ -277,6 +277,16 @@ export function createSessionCatalogGitHubLinker() {
   const profilesByAccountId = new Map<string, string>();
   const profilesByLogin = new Map<string, string>();
   const profiles: Parameters<typeof projectSessionParticipant>[1] = new Map();
+  const prepareDisplay = (id: string) => {
+    if (!profiles.has(id)) {
+      const profile = getUserProfileDisplaysNative([id]).get(id);
+      const display = resolveCurrentUserProfileDisplay(id, () => profile);
+      profiles.set(id, display.kind === "resolved" ? display : undefined);
+      if (display.kind === "resolved") {
+        profiles.set(display.profileId, display);
+      }
+    }
+  };
   for (const [profileId, { accounts }] of verifiedGitHubIdentities() ?? []) {
     for (const github of accounts) {
       const accountId = String(github.accountId);
@@ -296,6 +306,9 @@ export function createSessionCatalogGitHubLinker() {
         return participant;
       }
       const profileId = profilesByAccountId.get(identity.id);
+      if (profileId) {
+        prepareDisplay(profileId);
+      }
       return profileId
         ? projectSessionParticipant({ type: "profile", id: profileId }, profiles)
         : participant;
@@ -309,8 +322,11 @@ export function createSessionCatalogGitHubLinker() {
       if (!profileId) {
         return undefined;
       }
-      const profile = getUserProfileDisplaysNative([profileId]).get(profileId);
-      return profile ? projectSessionActor({ type: "human", id: profile.id }, profiles) : undefined;
+      prepareDisplay(profileId);
+      const profile = profiles.get(profileId);
+      return profile
+        ? projectSessionActor({ type: "human", id: profile.profileId }, profiles)
+        : undefined;
     },
   };
 }

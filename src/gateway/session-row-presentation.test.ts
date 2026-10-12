@@ -36,6 +36,7 @@ afterEach(() => vi.restoreAllMocks());
 
 it("projects send policy and recipient restrictions, clearing them when the current role permits sending", async () => {
   await withOpenClawTestState({ scenario: "minimal" }, async () => {
+    using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
     const cfg = rolePolicyConfig();
     cfg.gateway!.roles!.definitions.write!.sandbox = "required";
     cfg.gateway!.roles!.definitions.restricted = {
@@ -286,12 +287,14 @@ it.each(["running", "queued", "capacity-wait"] as const)(
 );
 
 it("presents current recipient roles without SQLite while rejecting source overrides and excluded children", async () => {
-  using _ = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+  using clock = vi.spyOn(Date, "now");
+  clock.mockReturnValue(1_800_000_000_000);
   await withOpenClawTestState({ scenario: "minimal" }, async () => {
     const owner = ensureProfileForEmail("owner@presentation.test");
     const member = ensureProfileForEmail("member@presentation.test");
     const viewer = ensureProfileForEmail("viewer@presentation.test");
     setUserProfileRole(viewer.id, "none");
+    using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
     const clients = [owner, member, viewer].map((profile) => {
       const client = Object.assign(sharingPolicyClient({ user: profile.id }), {
         connId: profile.id,

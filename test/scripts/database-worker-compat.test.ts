@@ -137,7 +137,7 @@ it("permits a deprecated API only from an exact reviewed one-shot entry", () => 
     [doctorFile, doctor.replace("collectAgentRuntimeToolSchemaFindings", "unreviewed")],
     ["src/flows/unreviewed.ts", doctor],
     [doctorFile, doctor.replace(`return ${first}()`, `return () => ${first}()`)],
-  ]) {
+  ] as const) {
     expect(inspectDoctor(file, source).violations).toEqual([
       expect.stringContaining("bundled runtime reference"),
     ]);
@@ -260,6 +260,29 @@ it("allows async-only members selected from a dynamic namespace import", () => {
   });
   expect(result.violations).toEqual([]);
 });
+
+it.each([".queryAsync", "['queryAsync']"])(
+  "allows a statically selected async member from an inline dynamic import: %s",
+  (selector) => {
+    const result = inspect({
+      "src/plugin-sdk/barrel.ts": `export { ${first} as oldQuery } from './sqlite-runtime-legacy.js';
+        export async function queryAsync() { return 1; }`,
+      "src/consumer.ts": `await (await import('./plugin-sdk/barrel.js'))${selector}();`,
+    });
+    expect(result.violations).toEqual([]);
+  },
+);
+
+it.each([".oldQuery", "['oldQuery']", "[key]"])(
+  "rejects a legacy or computed member from an inline dynamic import: %s",
+  (selector) => {
+    const result = inspect({
+      "src/plugin-sdk/barrel.ts": `export { ${first} as oldQuery } from './sqlite-runtime-legacy.js';`,
+      "src/consumer.ts": `const key = 'oldQuery'; (await import('./plugin-sdk/barrel.js'))${selector}();`,
+    });
+    expect(result.violations).toEqual([expect.stringContaining("src/consumer.ts:")]);
+  },
+);
 
 it("follows renamed namespace reexports and default exports", () => {
   const result = inspect({
@@ -628,6 +651,23 @@ export function ${first}() {
 }`,
   );
   expect(result.callLocations.get(legacyFile)).toEqual(new Set(["3:3", "4:3"]));
+});
+
+it("records profile reads inside the exact synchronous alias resolver", () => {
+  const profileFile = "src/state/user-profiles-internal.ts";
+  const result = inspect(
+    {
+      [profileFile]: `function readResolvedUserProfile(id, read) { return read(id); }
+export function selectResolvedUserProfile() {
+  return readResolvedUserProfile('id', (id) => executeSqliteQueryTakeFirstSync(db, query));
+}`,
+    },
+    `import { selectResolvedUserProfile } from '../state/user-profiles-internal.js';
+/** @deprecated Use workers. */
+export function ${first}() { return selectResolvedUserProfile(); }`,
+  );
+  expect(result.violations).toEqual([]);
+  expect(result.callLocations.get(profileFile)).toEqual(new Set(["3:10", "3:46"]));
 });
 
 it("does not confuse a nested function path with a live top-level namesake", () => {

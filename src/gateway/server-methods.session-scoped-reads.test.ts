@@ -83,6 +83,7 @@ describe("narrow session read owners", () => {
         const reader = roleClient("view", "row-reader");
         reader.connect.scopes = ["operator.sessions.read"];
         const owner = roleClient("view", "row-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         const cfg = roles ? rolePolicyConfig() : {};
         await state.writeConfig(cfg);
         const subscribers = createSessionMessageSubscriberRegistry();
@@ -186,6 +187,7 @@ describe("narrow session read owners", () => {
           ...roleClient("view", "subscription-reader"),
           connId: "subscription-reader",
         };
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         client.connect.scopes = ["operator.sessions.read"];
         const cfg = rolePolicyConfig();
         const entry = {
@@ -274,6 +276,7 @@ describe("narrow session read owners", () => {
       await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
         const client = roleClient("view", "metadata-reader");
         const owner = roleClient("view", "metadata-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         const cfg = rolePolicyConfig();
         await state.writeConfig(cfg);
         const entry = {
@@ -487,6 +490,7 @@ describe("narrow session read owners", () => {
   it.each(methods)("%s retains only current session read facts", async (method) => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const reader = roleClient("view", "retained-reader");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       reader.connect.scopes = ["operator.sessions.read"];
       const cfg = rolePolicyConfig();
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
@@ -571,6 +575,7 @@ describe("narrow session read owners", () => {
   it("rechecks session visibility before fetching a remote file after stat", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
       const reader = roleClient("view", "remote-reader");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       reader.connect.scopes = ["operator.sessions.read"];
       const cfg = rolePolicyConfig();
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
@@ -657,6 +662,7 @@ describe("narrow session read owners", () => {
           : identity === "solo"
             ? sharingPolicyClient({ user: GATEWAY_OWNER_PROFILE_ID, scopes: ["operator.read"] })
             : roleClient("view", "missing-reader");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       if (identity === "narrow" && client) {
         client.connect.scopes = ["operator.sessions.read"];
       }

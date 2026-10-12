@@ -132,6 +132,7 @@ describe("creator namespace authorization", () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const old = ensureProfileForEmail("old@example.test");
       const current = ensureProfileForEmail("current@example.test");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       const client = {
         connect: { scopes: ["operator.read"] },
         authenticatedUserProfile: { profileId: current.id },

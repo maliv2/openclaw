@@ -47,6 +47,7 @@ describe("invocation-owned session mutations", () => {
     async ({ owner, broad, rebind }) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const client = roleClient("write", "alias-stop-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         client.connId = "alias-stop-connection";
         client.connect.device = {
           id: "alias-device",
@@ -135,6 +136,7 @@ describe("invocation-owned session mutations", () => {
     async (method) => {
       await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
         const client = roleClient("view", "absent-route-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         client.connect.scopes = ["operator.sessions.write"];
         const originalStore = state.path("original", "sessions.json");
         const nextStore = state.path("replacement", "sessions.json");
@@ -187,6 +189,7 @@ describe("invocation-owned session mutations", () => {
     async ({ kind, method }) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const client = roleClient("view", "exact-stop-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         client.connId = "exact-stop-connection";
         client.connect.scopes = ["operator.sessions.write"];
         const cfg = rolePolicyConfig();
@@ -281,6 +284,7 @@ describe("invocation-owned session mutations", () => {
     async ({ kind, method }) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const client = roleClient("view", "reentrant-stop-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         client.connId = "reentrant-stop";
         client.connect.scopes = ["operator.sessions.write"];
         const cfg = rolePolicyConfig();
@@ -346,6 +350,7 @@ describe("invocation-owned session mutations", () => {
     async (method) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const client = roleClient("view", "initial-turn-owner");
+        using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         client.connect.scopes = ["operator.sessions.write"];
         const cfg = rolePolicyConfig();
         const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
@@ -382,6 +387,7 @@ describe("invocation-owned session mutations", () => {
       const client = roleClient("view", "mixed-grants");
       client.connect.scopes = ["operator.read", "operator.approvals", "operator.sessions.write"];
       const owner = roleClient("view", "mixed-owner");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       const cfg = rolePolicyConfig();
       expectDefined(cfg.gateway?.roles?.definitions.view, "mixed-grant role").scopes.push(
         "operator.approvals",
@@ -449,6 +455,7 @@ describe("invocation-owned session mutations", () => {
     const method = "sessions.steer";
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const client = roleClient("view", "send-owner");
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
       client.connect.scopes = ["operator.sessions.write"];
       const cfg = rolePolicyConfig();
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });

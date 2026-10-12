@@ -194,6 +194,7 @@ const synchronousScopes = new Map<string, ReadonlyMap<string, number>>([
   ],
   ["src/state/openclaw-state-db.ts", new Map([["runOpenClawStateWriteTransaction", 0]])],
   ["src/state/user-profile-mutation.ts", new Map([["runUserProfileWriteTransaction", 0]])],
+  ["src/state/user-profiles-internal.ts", new Map([["readResolvedUserProfile", 1]])],
   ["src/infra/sqlite-transaction.ts", new Map([["runSqliteDeferredTransactionSync", 1]])],
   [
     "src/plugins/runtime/generation-state.ts",
@@ -373,6 +374,12 @@ export function inspectDatabaseWorkerBoundaries(
       .flat()
       .map((name) => name.split(".").at(-1)!),
   );
+  const boundaryName = (node: BoundaryOperation["node"]) =>
+    ts.isArrowFunction(node) && ts.isPropertyAssignment(node.parent)
+      ? node.parent.name
+      : "name" in node
+        ? node.name
+        : undefined;
   const sources = [...sourceTexts.keys()].map((file) => {
     const source = program.getSourceFile(path.resolve(root, file));
     if (!source) {
@@ -403,12 +410,7 @@ export function inspectDatabaseWorkerBoundaries(
         };
         source.forEachChild(findMember);
       }
-      const nameNode =
-        node && ts.isArrowFunction(node) && ts.isPropertyAssignment(node.parent)
-          ? node.parent.name
-          : node && "name" in node
-            ? node.name
-            : undefined;
+      const nameNode = node && boundaryName(node);
       if (!node || !nameNode) {
         continue;
       }
@@ -788,6 +790,16 @@ export function inspectDatabaseWorkerBoundaries(
     if (known) {
       return known;
     }
+    if (ts.isAwaitExpression(expression) || ts.isParenthesizedExpression(expression)) {
+      return accessSymbol(expression.expression);
+    }
+    if (
+      ts.isCallExpression(expression) &&
+      expression.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      expression.arguments[0]
+    ) {
+      return resolveSymbol(checker.getSymbolAtLocation(expression.arguments[0]));
+    }
     if (ts.isPropertyAccessExpression(expression)) {
       const base = accessSymbol(expression.expression);
       if (base && base.flags & SymbolFlags.Module) {
@@ -795,6 +807,23 @@ export function inspectDatabaseWorkerBoundaries(
       }
     }
     return undefined;
+  };
+  const selectsImportMember = (call: ts.CallExpression): boolean => {
+    let expression: ts.Expression = call;
+    while (
+      (ts.isAwaitExpression(expression.parent) ||
+        ts.isParenthesizedExpression(expression.parent)) &&
+      expression.parent.expression === expression
+    ) {
+      expression = expression.parent;
+    }
+    return (
+      (ts.isPropertyAccessExpression(expression.parent) &&
+        expression.parent.expression === expression) ||
+      (ts.isElementAccessExpression(expression.parent) &&
+        expression.parent.expression === expression &&
+        ts.isStringLiteral(expression.parent.argumentExpression))
+    );
   };
   for (const { file, source } of sources) {
     const references: ts.Node[] = [];
@@ -817,7 +846,8 @@ export function inspectDatabaseWorkerBoundaries(
           (ts.isStringLiteral(node) &&
             ts.isCallExpression(node.parent) &&
             node.parent.expression.kind === ts.SyntaxKind.ImportKeyword &&
-            !handledImports.has(node.parent))) &&
+            !handledImports.has(node.parent) &&
+            !selectsImportMember(node.parent))) &&
         !declarationNames.has(node) &&
         !declarations.has(node.parent) &&
         !(ts.isBindingElement(node.parent) && node.parent.name === node) &&

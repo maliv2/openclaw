@@ -27,6 +27,7 @@ import {
   isUserProfileCatalogReady,
   resolveUserProfileReference,
 } from "./user-profile-list.js";
+import { getUserProfileDisplaysNative } from "./user-profile-list.native.js";
 import {
   linkEmail,
   setAvatar,
@@ -379,9 +380,9 @@ describe("resident profile display and reference catalog", () => {
     },
   );
 
-  it("reads only display columns for one-hop aliases and native text keys without creating missing storage", () => {
+  it("keeps native display reads bounded for one-hop aliases and text keys without creating missing storage", () => {
     const options = fixture();
-    expect(getUserProfileDisplays(["missing"], options).size).toBe(0);
+    expect(getUserProfileDisplaysNative(["missing"], options).size).toBe(0);
     expect(fs.existsSync(options.path)).toBe(false);
     const target = ensureProfileForEmail("target@example.test", options);
     const alias = ensureProfileForEmail("alias@example.test", options);
@@ -399,14 +400,11 @@ describe("resident profile display and reference catalog", () => {
       "INSERT INTO user_profiles (id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?)",
     ).run(boundId, "Native text", 1, 1);
     const ids = [alias.id, dangling.id, requestedId, "missing"];
-    const displays = getUserProfileDisplays(ids, options);
+    const displays = getUserProfileDisplaysNative(ids, options);
     expect(displays.size).toBe(3);
-    for (const id of ids.slice(0, -1)) {
-      expect(displays.get(id)).toEqual(getUserProfileDisplay(id, options));
-    }
-    expect(displays.get(alias.id)?.id).toBe(target.id);
-    expect(displays.get(dangling.id)?.id).toBe(dangling.id);
-    expect(displays.get(requestedId)?.id).toBe(boundId);
+    expect(displays.get(alias.id)).toMatchObject({ id: target.id, displayName: "target" });
+    expect(displays.get(dangling.id)).toMatchObject({ id: dangling.id, displayName: "dangling" });
+    expect(displays.get(requestedId)).toMatchObject({ id: boundId, displayName: "Native text" });
 
     const nonStrictOptions = fixture();
     const nonStrictDb = openOpenClawStateDatabase(nonStrictOptions).db;
@@ -427,12 +425,9 @@ describe("resident profile display and reference catalog", () => {
         "INSERT INTO user_profiles (id, display_name, merged_into, updated_at) VALUES (?, ?, ?, 1)",
       )
       .run("blob-alias", "Alias", blobId);
-    expect(getUserProfileDisplays(["blob-alias"], nonStrictOptions).get("blob-alias")).toEqual(
-      getUserProfileDisplay("blob-alias", nonStrictOptions),
-    );
-    expect(getUserProfileDisplay("blob-alias", nonStrictOptions).displayName).toBe(
-      "Native BLOB target",
-    );
+    expect(
+      getUserProfileDisplaysNative(["blob-alias"], nonStrictOptions).get("blob-alias"),
+    ).toMatchObject({ displayName: "Native BLOB target" });
   });
 
   it("keeps dormant ambiguity and exact-ID precedence inside the allowed visibility scope", async () => {

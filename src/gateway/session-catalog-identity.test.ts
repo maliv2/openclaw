@@ -17,8 +17,14 @@ afterEach(() => vi.restoreAllMocks());
 
 it("keeps legacy creator reads lazy and resolves actors outside the prepared cohort", async () => {
   await withOpenClawTestState({ scenario: "minimal" }, async () => {
-    const known = syncGitHubIdentity({ identity: { accountId: 201, login: "known" } });
-    const unknown = syncGitHubIdentity({ identity: { accountId: 202, login: "unknown" } });
+    const known = syncGitHubIdentity({
+      identity: { accountId: 201, login: "known" },
+      authenticationAlias: { kind: "email", email: "known@example.test" },
+    });
+    const unknown = syncGitHubIdentity({
+      identity: { accountId: 202, login: "unknown" },
+      authenticationAlias: { kind: "email", email: "unknown@example.test" },
+    });
     const actor = { type: "human", source: "profile", id: known.id } as const;
     const reads = vi.spyOn(nativeProfiles, "getUserProfileDisplaysNative");
     const project = createSessionCatalogSourceActorProjector({

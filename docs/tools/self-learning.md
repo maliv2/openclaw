@@ -22,8 +22,8 @@ Learning happens in three places:
 - **Unused-skill cleanup** archives learned skills unused for 30 days. See
   [Unused-skill cleanup](/tools/skill-workshop#unused-skill-cleanup).
 
-Every change applies immediately and can be undone. Background review notices
-appear only in the Control UI chat. See [Undo](/tools/skill-workshop#undo).
+Every change applies immediately and can be undone. Background review changes
+appear in the Control UI chat. See [Undo](/tools/skill-workshop#undo).
 
 ## When a review runs
 
@@ -92,21 +92,25 @@ commands, paths, or ids. When nothing durable was learned, it changes nothing.
 
 ## What you see
 
-If the review changed a skill, its session transcript gets a notice:
+When a review changes a skill, every session gets a **Learned** row in the
+Control UI chat: one chip per changed skill, each opening that skill in the
+Skill Workshop, and an **Undo** button. Nothing appears when nothing changed.
+
+Channel messages are off by default. Set
+`skills.workshop.autonomous.channelNotices: true` to also post a notice to the
+conversation that triggered the review:
 
 ```text
 💾 Learned: updated `deploy-staging` (tightened the rollback step). Say "undo" to revert this skill change.
 ```
 
-The Control UI chat shows it as a **Learned** row for every session, including
-channel sessions: one chip per changed skill, each opening that skill in the
-Skill Workshop, and an **Undo** button. Channels get no message. Nothing is
-shown when nothing changed.
+Slack never gets a channel message; its sessions still get the Control UI row.
 
-To undo everything the review changed, press **Undo** on the Control UI row.
-You can also say "undo" in the originating conversation, including on a channel,
-and the agent restores the previous version. To undo an individual skill, use
-the Workshop page or `openclaw skills workshop restore <name>`. See
+To undo everything the review changed, press **Undo** on the Control UI row or
+channel notice. Channels that do not render buttons show a copyable
+`/learn undo <id>` command; the id comes from the channel notice. You can also
+say "undo" in the conversation, whether channel notices are on or off, and the
+agent restores the previous version. See
 [Skill Workshop undo](/tools/skill-workshop#undo).
 
 A review stops without changing anything further if you turn learning off, or

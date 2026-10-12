@@ -1,17 +1,26 @@
 import type { EmbeddedAgentRunResult } from "../../agents/embedded-agent-runner/types.js";
 import { getReplyPayloadMetadata } from "../../auto-reply/reply-payload.js";
+import { extractDeliveryInfo } from "../../config/sessions/delivery-info.js";
 import { loadSessionEntryReadOnly } from "../../config/sessions/session-accessor.js";
 import type { SessionDeliveryGeneration } from "../../config/sessions/session-delivery-generation.types.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import { buildOutboundSessionContext } from "../../infra/outbound/session-context.js";
 import { resolveSystemEventQueueKey } from "../../infra/system-event-ownership.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
+import type { MessagePresentation } from "../../interactive/payload.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import type {
   SkillWorkshopChangeNoticeSkill,
   SkillWorkshopNoticeAction,
 } from "../../shared/skill-workshop-change-notice.js";
 import { SKILL_WORKSHOP_CHANGE_NOTICE_KIND } from "../../shared/transcript-only-openclaw-assistant.js";
+import {
+  isDeliverableMessageChannel,
+  normalizeMessageChannel,
+} from "../../utils/message-channel.js";
 import type { WorkshopChange } from "./changes.kernel.js";
+import { resolveSkillWorkshopConfig } from "./config.js";
+import { workshopReviewIdOf } from "./review-undo.js";
 
 const log = createSubsystemLogger("skills/workshop");
 
@@ -79,17 +88,32 @@ function formatWorkshopChangeNotice(
       ? `skill_workshop action=restore name=${skillName} version=${versionId}`
       : `skill_workshop action=archive name=${skillName} reason="undo"`,
   );
+  const reviewId = workshopReviewIdOf(runId);
+  const presentation: MessagePresentation | undefined = reviewId
+    ? {
+        blocks: [
+          {
+            type: "buttons",
+            buttons: [
+              { label: "Undo", action: { type: "command", command: `/learn undo ${reviewId}` } },
+            ],
+          },
+        ],
+      }
+    : undefined;
   return {
     text,
+    presentation,
     marker: { kind: SKILL_WORKSHOP_CHANGE_NOTICE_KIND, agentId, runId, skills },
     undoContext: `A background skill review just changed your learned skills: ${text} If the user asks to undo or revert it, call ${reverts.join("; then ")}.`,
   };
 }
 
 /**
- * Appends a notice transcript row shown by the Control UI, including for channel sessions.
- * Channels get no message. The next foreground turn still gets a system event naming the
- * exact revert call, even if the user has not seen the notice.
+ * Records a Control UI notice for every session. Opted-in, supported channels get a durable
+ * send mirrored into the session transcript; all others get a transcript entry directly.
+ * The next foreground turn also gets a system event naming the exact revert call,
+ * because an assistant line the model did not write is weak evidence that "undo" means it.
  * A conversation reset or replaced since the review started gets none of it.
  */
 export async function postWorkshopChangeNotice(params: {
@@ -121,7 +145,11 @@ export async function postWorkshopChangeNotice(params: {
     log.debug(`skill workshop notice skipped: session ${sessionKey} was reset`);
     return;
   }
-  const { text, marker, undoContext } = formatWorkshopChangeNotice(
+  const { deliveryContext: target, threadId } = await extractDeliveryInfo(sessionKey, {
+    cfg: params.config,
+  });
+  const channel = target?.channel ? normalizeMessageChannel(target.channel) : undefined;
+  const { text, presentation, marker, undoContext } = formatWorkshopChangeNotice(
     agentId,
     params.runId,
     params.changes,
@@ -131,6 +159,44 @@ export async function postWorkshopChangeNotice(params: {
   });
   const idempotencyKey = `skill-workshop-notice:${params.runId}`;
   try {
+    // Slack never gets a channel message (owner decision).
+    if (
+      resolveSkillWorkshopConfig(params.config).autonomous.channelNotices &&
+      channel &&
+      channel !== "slack" &&
+      isDeliverableMessageChannel(channel) &&
+      target?.to
+    ) {
+      // Delivery and transcript runtimes stay lazy: most reviews change nothing.
+      const { sendDurableMessageBatchCore } = await import("../../channels/message/runtime.js");
+      const send = await sendDurableMessageBatchCore(
+        {
+          cfg: params.config,
+          channel,
+          to: target.to,
+          accountId: target.accountId,
+          // The session key's thread is canonical; stored context may name a stale thread.
+          threadId: threadId ?? target.threadId,
+          // Channels with buttons run the Undo command; plain-text channels show it to copy.
+          payloads: [presentation ? { text, presentation } : { text }],
+          session: buildOutboundSessionContext({ cfg: params.config, sessionKey, agentId }),
+          mirror: {
+            sessionKey,
+            agentId,
+            idempotencyKey,
+            expectedSessionId: generation.sessionId,
+          },
+          bestEffort: true,
+        },
+        undefined,
+        undefined,
+        generation,
+      );
+      if (send.status === "failed" || send.status === "partial_failed") {
+        throw send.error;
+      }
+      return;
+    }
     const { appendAssistantMessageToSessionTranscript } =
       await import("../../config/sessions/transcript.runtime.js");
     const appended = await appendAssistantMessageToSessionTranscript({

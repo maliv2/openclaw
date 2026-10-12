@@ -263,6 +263,7 @@ export async function runSessionStartupMigration(params: {
   const registeredDatabases = new Set(
     listOpenClawRegisteredAgentDatabases({ env }).map((entry) => `${entry.agentId}\0${entry.path}`),
   );
+  const configuredTargets = resolveConfiguredAgentDatabaseTargets(params.cfg, { env });
   const tasks = targets.map((target) => async () => {
     params.assertCurrent?.();
     const options = toDatabaseOptions(resolveSqliteReadScope({ ...target, env }));
@@ -298,7 +299,7 @@ export async function runSessionStartupMigration(params: {
         // Missing registry entries still need recovery before runtime can discover their lineage.
         if (
           registeredDatabases.has(`${options.agentId}\0${databasePath}`) &&
-          !isConfiguredAgentDatabaseTarget(params.cfg, options.agentId, databasePath, env)
+          !isConfiguredAgentDatabaseTarget(configuredTargets, options.agentId, databasePath)
         ) {
           return false;
         }

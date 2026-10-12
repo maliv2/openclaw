@@ -9,7 +9,10 @@ import {
 import { resolveAgentSessionDirsFromAgentsDirSync } from "../../agents/session-dirs.js";
 import { normalizeAgentId, parseAgentSessionKey } from "../../routing/session-key.js";
 import { withOpenClawAgentDatabaseReadOnly } from "../../state/openclaw-agent-db-readonly.js";
-import { createOpenClawAgentDatabasePathMatcher } from "../../state/openclaw-agent-db.paths.js";
+import {
+  createOpenClawAgentDatabasePathMatcher,
+  isSameOpenClawAgentDatabasePath,
+} from "../../state/openclaw-agent-db.paths.js";
 import {
   resolveSessionStoreCompatibilityAgentId,
   tryResolveLegacyCompatibilityAgentId,
@@ -18,10 +21,7 @@ import { resolveStateDir } from "../paths.js";
 import type { OpenClawConfig } from "../types.openclaw.js";
 import { resolveAgentsDirFromSessionStorePath, resolveSessionStorePathCore } from "./paths.js";
 import { iterateSessionEntryKeys } from "./session-accessor.sqlite-entry-inventory.js";
-import {
-  listSqliteTargetCandidatePathsForSessionStorePath,
-  resolveUnsuffixedSqliteTargetFromSessionStorePath,
-} from "./session-sqlite-target-paths.js";
+import { listSqliteTargetCandidatePathsForSessionStorePath } from "./session-sqlite-target-paths.js";
 import {
   listDurableSqliteTargetOwnersForSessionStorePath,
   readSessionStoreRegistryRows,
@@ -625,17 +625,14 @@ export function resolveConfiguredAgentDatabaseTargets(
 }
 
 export function isConfiguredAgentDatabaseTarget(
-  cfg: OpenClawConfig,
+  targets: readonly { agentId: string; path: string }[],
   agentId: string | undefined,
   pathname: string,
-  env: NodeJS.ProcessEnv,
 ): boolean {
-  return (
-    (agentId !== undefined && isConfiguredSessionStoreAgentId(cfg, agentId)) ||
-    resolveConfiguredSessionStoreTargets(cfg, env).some(
-      ({ storePath }) =>
-        resolveUnsuffixedSqliteTargetFromSessionStorePath(storePath).path === pathname,
-    )
+  return targets.some(
+    (target) =>
+      (agentId === undefined || target.agentId === agentId) &&
+      isSameOpenClawAgentDatabasePath(target.path, pathname),
   );
 }
 

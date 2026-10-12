@@ -6,6 +6,7 @@ import { resolveStateDir } from "../config/paths.js";
 import {
   isConfiguredAgentDatabaseTarget,
   resolveConfiguredAgentDatabaseCandidatePaths,
+  resolveConfiguredAgentDatabaseTargets,
 } from "../config/sessions/targets.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -324,19 +325,26 @@ export async function preflightOpenClawDatabaseSchemas(
   for (const failure of failures) {
     result.indeterminate.push({ kind: "agent", ...failure });
   }
+  const configuredTargets =
+    admissionConfig &&
+    (options.requireStartupMigrationReadiness || options.reuseStartupSchemaPreparation)
+      ? resolveConfiguredAgentDatabaseTargets(admissionConfig, {
+          env: options.env,
+          registeredDatabases,
+        })
+      : undefined;
   const skipped = new Set<string>();
   const inspectionTargets = candidates
     .filter((row) => {
       if (
-        !admissionConfig ||
-        !(options.requireStartupMigrationReadiness || options.reuseStartupSchemaPreparation) ||
-        isConfiguredAgentDatabaseTarget(admissionConfig, row.agentId, row.path, options.env)
+        !configuredTargets ||
+        isConfiguredAgentDatabaseTarget(configuredTargets, row.agentId, row.path)
       ) {
         return true;
       }
       if (options.requireStartupMigrationReadiness && !skipped.has(row.path)) {
         createSubsystemLogger("state/agent-admission").warn(
-          `Skipped ${nodePath.basename(row.path)}: unconfigured agent database; run openclaw doctor to inspect retained data.`,
+          `Skipped ${nodePath.basename(row.path)}: database is not a configured target; run openclaw doctor to inspect retained data.`,
         );
         skipped.add(row.path);
       }

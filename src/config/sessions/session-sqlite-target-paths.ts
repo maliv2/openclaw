@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { normalizeAgentId } from "@openclaw/normalization-core/agent-id";
 import { hasErrnoCode } from "../../infra/errno.js";
+import { resolveConcreteSessionStorePath } from "./paths.js";
 
 /** Resolves only the legacy unsuffixed target, without reading ownership state. */
 export function resolveUnsuffixedSqliteTargetFromSessionStorePath(storePath: string): {
@@ -9,7 +10,11 @@ export function resolveUnsuffixedSqliteTargetFromSessionStorePath(storePath: str
   path: string;
   shared?: boolean;
 } {
-  const resolved = path.resolve(storePath);
+  const concrete = resolveConcreteSessionStorePath(storePath);
+  if (!concrete) {
+    throw new Error("Session storage requires a concrete store path");
+  }
+  const resolved = path.resolve(concrete);
   if (resolved.endsWith(".sqlite")) {
     const agentId = resolveAgentIdFromSqliteDatabasePath(resolved);
     return { path: resolved, ...(agentId ? { agentId } : { shared: true }) };

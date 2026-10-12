@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GATEWAY_OWNER_PROFILE_ID } from "../../packages/gateway-protocol/src/schema/users.js";
 import { PreparedModelRuntimePublicationSupersededError } from "../agents/prepared-model-runtime.errors.js";
 import { registerAgentWorkspaceAccess } from "../agents/workspace-access.js";
+import { setRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
 import * as sessions from "../config/sessions/session-accessor.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import { prepareUserProfileCatalog } from "../state/user-profile-list.js";
@@ -87,6 +88,7 @@ describe("narrow session read owners", () => {
         using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         prepareGatewayRecipientProfile(reader);
         const cfg = roles ? rolePolicyConfig() : {};
+        setRuntimeConfigSnapshot(cfg);
         await state.writeConfig(cfg);
         const subscribers = createSessionMessageSubscriberRegistry();
         const context = await createHistoryReadContext({
@@ -193,6 +195,7 @@ describe("narrow session read owners", () => {
         prepareGatewayRecipientProfile(client);
         client.connect.scopes = ["operator.sessions.read"];
         const cfg = rolePolicyConfig();
+        setRuntimeConfigSnapshot(cfg);
         const entry = {
           sessionId: "original",
           lifecycleRevision: "original",
@@ -282,6 +285,7 @@ describe("narrow session read owners", () => {
         using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
         prepareGatewayRecipientProfile(client);
         const cfg = rolePolicyConfig();
+        setRuntimeConfigSnapshot(cfg);
         await state.writeConfig(cfg);
         const entry = {
           sessionId: "metadata-session",
@@ -385,6 +389,7 @@ describe("narrow session read owners", () => {
   it("separates a trusted solo operator from its sharing exemption", async () => {
     const method = "sessions.files.get";
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      setRuntimeConfigSnapshot({});
       const client = sharingPolicyClient({
         user: GATEWAY_OWNER_PROFILE_ID,
         scopes: ["operator.sessions.read"],
@@ -434,10 +439,11 @@ describe("narrow session read owners", () => {
       const reader = roleClient("view", "scoped-reader");
       reader.connect.scopes = ["operator.sessions.read"];
       const owner = roleClient("view", "scoped-owner");
-      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
-      prepareGatewayRecipientProfile(reader);
       const cfg = rolePolicyConfig();
       cfg.gateway!.roles!.definitions.view!.scopes.push("operator.admin");
+      setRuntimeConfigSnapshot(cfg);
+      using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      prepareGatewayRecipientProfile(reader);
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
       const io = prepareRead(method, async () => {});
       const request = async () => {
@@ -499,6 +505,7 @@ describe("narrow session read owners", () => {
       prepareGatewayRecipientProfile(reader);
       reader.connect.scopes = ["operator.sessions.read"];
       const cfg = rolePolicyConfig();
+      setRuntimeConfigSnapshot(cfg);
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
       for (const changed of [
         "metadata-no-revision",
@@ -585,6 +592,7 @@ describe("narrow session read owners", () => {
       prepareGatewayRecipientProfile(reader);
       reader.connect.scopes = ["operator.sessions.read"];
       const cfg = rolePolicyConfig();
+      setRuntimeConfigSnapshot(cfg);
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
       for (const revoke of [false, true]) {
         const entry = {
@@ -663,6 +671,8 @@ describe("narrow session read owners", () => {
     ["sessions.files.get", "internal"],
   ] as const)("%s keeps missing-row access for %s callers", async (method, identity) => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      const cfg = identity === "narrow" ? rolePolicyConfig() : {};
+      setRuntimeConfigSnapshot(cfg);
       const client =
         identity === "internal"
           ? null
@@ -681,7 +691,7 @@ describe("narrow session read owners", () => {
       await dispatchRead(method, {
         client,
         context: createDirectChatContext({
-          getRuntimeConfig: identity === "narrow" ? rolePolicyConfig : () => ({}),
+          getRuntimeConfig: () => cfg,
         }),
         respond,
       });

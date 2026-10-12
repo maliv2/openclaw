@@ -5,6 +5,7 @@ import {
   setActiveEmbeddedRun,
 } from "../../agents/embedded-agent-runner/runs.js";
 import { createEmbeddedRunHandle } from "../../agents/embedded-agent-runner/runs.test-support.js";
+import { setRuntimeConfigSnapshot } from "../../config/runtime-snapshot.js";
 import { resolveSessionStorePathCore } from "../../config/sessions.js";
 import {
   loadSessionEntry,
@@ -133,6 +134,7 @@ describe("chat send stop ownership", () => {
         session: { store: state.statePath("agents", "{agentId}", "sessions", "sessions.sqlite") },
       };
       await state.writeConfig(cfg);
+      setRuntimeConfigSnapshot(cfg);
       fixture.context.getRuntimeConfig = () => cfg;
       params.request.stopCommand = true;
       params.request.p.message = "/stop";
@@ -197,6 +199,7 @@ describe("chat send stop ownership", () => {
         },
       };
       await state.writeConfig(cfg);
+      setRuntimeConfigSnapshot(cfg);
       fixture.context.getRuntimeConfig = () => cfg;
       params.request.stopCommand = true;
       params.request.p = {
@@ -586,6 +589,7 @@ describe("chat send retry identity", () => {
     "rechecks the canonical profile after real recovery without changing %s outcomes",
     async (outcome) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
+        setRuntimeConfigSnapshot({});
         const { fixture, params } = preAdmissionFixture(`profile-recovery-${outcome}`);
         const sourceEmail = "recovery-source@example.test";
         const source = ensureProfileForEmail(sourceEmail);

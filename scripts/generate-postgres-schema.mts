@@ -79,7 +79,7 @@ export async function generateWorkboardPostgresSchema() {
 export async function generatePostgresSchemas(
   root = ROOT,
   prefix = "openclaw",
-  options: { reportOnly?: boolean } = {},
+  options: { reportOnly?: boolean; includeJsonReport?: boolean } = {},
 ) {
   if (!prefix || Buffer.byteLength(`${prefix}_state`) > 63 || prefix.includes("\0")) {
     throw new Error("Schema prefix must fit PostgreSQL's 63-byte identifier limit");
@@ -157,7 +157,7 @@ export async function generatePostgresSchemas(
       continue;
     }
     const statements = [
-      "-- Generated from canonical SQLite; consult portability-report.json before use.",
+      "-- Generated from canonical SQLite; consult portability-report.md before use.",
       "BEGIN;",
       "SET LOCAL standard_conforming_strings = on;",
       `CREATE SCHEMA ${quote(data.schema)};`,
@@ -205,7 +205,9 @@ export async function generatePostgresSchemas(
     fragments: manifest,
     catalogs,
   };
-  files["portability-report.json"] = `${JSON.stringify(report, null, 2)}\n`;
+  if (options.includeJsonReport) {
+    files["portability-report.json"] = `${JSON.stringify(report, null, 2)}\n`;
+  }
   const markdown = [
     "# PostgreSQL portability report",
     "",
@@ -391,7 +393,7 @@ if (isDirectRunUrl(process.argv[1], import.meta.url)) {
     await checkPostgresCatalog(values["check-connection"]);
   } else if (values.help) {
     console.log(
-      "Usage: pnpm db:postgres:gen [--out <dir>] [--schema-prefix openclaw] [--verify]\n       pnpm db:postgres:gen --target workboard [--verify]\n       pnpm db:postgres:gen --check-connection <dsn>\n--verify-psql accepts a trusted psql shell command and expects eager DDL plus all fragments already applied.",
+      "Usage: pnpm db:postgres:gen [--out <dir>] [--schema-prefix openclaw] [--verify]\n       pnpm db:postgres:gen --target workboard [--verify]\n       pnpm db:postgres:gen --check-connection <dsn>\n--out also exports the diagnostic portability-report.json; default tracked outputs omit it.\n--verify-psql accepts a trusted psql shell command and expects eager DDL plus all fragments already applied.",
     );
   } else if (values.target === "workboard") {
     if (values.out || values["verify-psql"]) {
@@ -417,7 +419,9 @@ if (isDirectRunUrl(process.argv[1], import.meta.url)) {
       throw new Error("Use --target canonical or --target workboard");
     }
     const out = values.out ?? path.join(ROOT, OUTPUT);
-    const result = await generatePostgresSchemas(ROOT, values["schema-prefix"]);
+    const result = await generatePostgresSchemas(ROOT, values["schema-prefix"], {
+      includeJsonReport: values.out !== undefined,
+    });
     if (!values.verify) {
       fs.mkdirSync(out, { recursive: true });
     }

@@ -1,4 +1,4 @@
--- Generated from canonical SQLite; consult portability-report.json before use.
+-- Generated from canonical SQLite; consult portability-report.md before use.
 
 BEGIN;
 

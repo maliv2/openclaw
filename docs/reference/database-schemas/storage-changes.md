@@ -79,6 +79,9 @@ fragments, dependency manifest, and portability reports in
 `src/state/postgres-schema.generated/`. `pnpm db:postgres:check` verifies their
 freshness and the generator's unit contracts. PostgreSQL **16 or newer** is
 required for `IS JSON`; the conformance job currently uses PostgreSQL 17.
+The detailed JSON diagnostic report stays in memory by default. An explicit
+`pnpm db:postgres:gen --out <diagnostic-directory>` exports it alongside the
+generated files; `portability-report.json` is not a tracked artifact.
 
 The canonical SQLite schema and feature-local DDL remain authoritative. The
 feature declarations in `src/state/openclaw-state-feature-schema.ts` supply both

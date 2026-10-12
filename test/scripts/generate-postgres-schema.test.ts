@@ -61,7 +61,6 @@ describe("PostgreSQL schema generation", () => {
         "agent.postgres.sql",
         ...generated.report.fragments.map((fragment) => fragment.file),
         "manifest.json",
-        "portability-report.json",
         "portability-report.md",
         "state.postgres.sql",
       ].toSorted(),
@@ -85,7 +84,8 @@ describe("PostgreSQL schema generation", () => {
         );
       }
     }
-    expect(JSON.parse(generated.files["portability-report.json"]!)).toEqual(generated.report);
+    const exported = await generatePostgresSchemas(root, "openclaw", { includeJsonReport: true });
+    expect(JSON.parse(exported.files["portability-report.json"]!)).toEqual(generated.report);
     for (const name of ["state", "agent"]) {
       const db = new DatabaseSync(":memory:");
       try {

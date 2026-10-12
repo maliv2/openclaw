@@ -211,14 +211,6 @@ const synchronousScopes = new Map<string, ReadonlyMap<string, number>>([
   ],
 ]);
 
-// Installed by openclaw-state-worker-registry.ts; this table is never a host callback API.
-const workerHandlers = new Map([
-  [
-    "src/state/user-github-connections.worker.ts",
-    "userGitHubConnectionOperations.userGitHubConnections.list",
-  ],
-]);
-
 type NonRuntimeTier = "T2" | "T3" | "W";
 
 type BoundaryOperation = {
@@ -330,23 +322,6 @@ export function inspectDatabaseWorkerBoundaries(
     return parts.join(".");
   };
   const isInlineInvocation = (node: ts.Node): boolean => {
-    const property = node.parent;
-    if (ts.isPropertyAssignment(property) && ts.isObjectLiteralExpression(property.parent)) {
-      const initializer = property.parent.parent;
-      const declaration = ts.isSatisfiesExpression(initializer) ? initializer.parent : initializer;
-      const file = path.relative(root, node.getSourceFile().fileName).split(path.sep).join("/");
-      if (
-        ts.isVariableDeclaration(declaration) &&
-        ts.isVariableDeclarationList(declaration.parent) &&
-        ts.isVariableStatement(declaration.parent.parent) &&
-        ts.isSourceFile(declaration.parent.parent.parent) &&
-        ts.isIdentifier(declaration.name) &&
-        (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
-        workerHandlers.get(file) === `${declaration.name.text}.${property.name.text}`
-      ) {
-        return true;
-      }
-    }
     const call = node.parent;
     if (!ts.isCallExpression(call)) {
       return false;
@@ -901,7 +876,9 @@ export function inspectDatabaseWorkerBoundaries(
           ts.isMethodDeclaration(parent) ||
           ts.isFunctionDeclaration(parent) ||
           ((ts.isArrowFunction(parent) || ts.isFunctionExpression(parent)) &&
-            !isInlineInvocation(parent))
+            !isInlineInvocation(parent) &&
+            // Reviewed worker-only modules retain their callbacks in the worker realm.
+            classifyEntry(file, "") !== "W")
         ) {
           unprovenCallback = ts.isArrowFunction(parent) || ts.isFunctionExpression(parent);
           break;

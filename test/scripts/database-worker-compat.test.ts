@@ -800,7 +800,31 @@ it("classifies a shared kernel with exclusively worker callers as worker-owned",
   );
 });
 
-it("requires the registered worker module, table, and operation for a handler callback", () => {
+it.each([
+  `export const handlers = { run: () => writeCurrentStateSchemaMetadata() };`,
+  `export function createHandler() { return () => writeCurrentStateSchemaMetadata(); }`,
+])("retains callback execution inside a reviewed worker-only module: %s", (body) => {
+  const result = inspectMaintenance({
+    "src/commands/doctor.ts": "export {};",
+    "src/read.worker.ts": `import { writeCurrentStateSchemaMetadata } from './state/openclaw-state-db-maintenance.js';
+      ${body}`,
+  });
+  expect(result.nonRuntimeOperations.get(maintenanceFile)?.get("persistSchema")).toBe("W");
+});
+
+it.each(["src/unregistered.worker.ts", "src/commands/doctor.ts", "src/gateway/handler.ts"])(
+  "does not infer a worker callback boundary from %s",
+  (file) => {
+    const result = inspectMaintenance({
+      "src/commands/doctor.ts": "export {};",
+      [file]: `import { writeCurrentStateSchemaMetadata } from '${file === "src/unregistered.worker.ts" ? "./state" : "../state"}/openclaw-state-db-maintenance.js';
+        export const handlers = { run: () => writeCurrentStateSchemaMetadata() };`,
+    });
+    expect(result.nonRuntimeOperations.has(maintenanceFile)).toBe(false);
+  },
+);
+
+it("uses reviewed worker ownership for its complete handler table", () => {
   const file = "src/state/user-github-connections.worker.ts";
   const handler = `import { writeCurrentStateSchemaMetadata } from './openclaw-state-db-maintenance.js';
     export const userGitHubConnectionOperations = {
@@ -819,6 +843,6 @@ it("requires the registered worker module, table, and operation for a handler ca
       "src/commands/doctor.ts": "export {};",
       [caller]: source,
     });
-    expect(escaped.nonRuntimeOperations.has(maintenanceFile)).toBe(false);
+    expect(escaped.nonRuntimeOperations.has(maintenanceFile)).toBe(caller === file);
   }
 });

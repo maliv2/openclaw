@@ -165,8 +165,10 @@ export function createSessionCatalogSourceActorProjector(
     ),
   ];
   let facts: Map<string, ReturnType<typeof readSourceProfileFacts>> | undefined;
-  return (actor) =>
-    projectSourceActor({ ...params, actor }, (requestedId) => {
+  return (actor) => {
+    const requestedId = actor && sessionCreatorProfileId(actor);
+    let requestedProfile: ReturnType<typeof readSourceProfileFacts> | undefined;
+    if (requestedId) {
       if (!facts) {
         const profiles = getUserProfileDisplaysNative(ids);
         const canonicalIds = [...new Set(ids.map((id) => profiles.get(id)?.id ?? id))];
@@ -179,8 +181,13 @@ export function createSessionCatalogSourceActorProjector(
           }),
         );
       }
-      return facts.get(requestedId) ?? readSourceProfileFacts(requestedId);
-    });
+      requestedProfile = facts.get(requestedId) ?? readSourceProfileFacts(requestedId);
+    }
+    return projectSourceActor(
+      { ...params, actor },
+      (id) => requestedProfile ?? { profileId: id, profile: undefined, github: undefined },
+    );
+  };
 }
 
 /** Prepare portable creator claims at the profile reader before synchronous page disclosure. */

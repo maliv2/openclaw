@@ -61,6 +61,15 @@ it("repairs empty sentinel registrations on every platform without losing sessio
     };
     replaceSessionEntrySync(retainedScope, { sessionId: "retained", updatedAt: 1 });
     await closeOpenClawAgentDatabasesAsync();
+    const migrated = openNodeSqliteDatabase(emptyPath);
+    try {
+      // Released Doctor records this completed migration even for an empty database.
+      migrated
+        .prepare("INSERT INTO schema_meta VALUES (?, 'agent', 1, 'ops', ?, 1, 1)")
+        .run("historical-transcript-directives-v1", JSON.stringify({ phase: "complete" }));
+    } finally {
+      migrated.close();
+    }
 
     const warnings = await noteDoctorAgentDatabasePathHealth({
       env: state.env,

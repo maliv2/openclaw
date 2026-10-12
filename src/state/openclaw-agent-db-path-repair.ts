@@ -10,6 +10,7 @@ import { createVerifiedSqliteSnapshot } from "../infra/sqlite-snapshot.js";
 import { readActiveUpdateRun } from "../infra/update-run-read.kernel.js";
 import { OPENCLAW_AGENT_SCHEMA_VERSION } from "./openclaw-agent-db-contract.js";
 import { withAgentDatabaseMaintenanceLease } from "./openclaw-agent-db-maintenance-lease.js";
+import { readExistingAgentSchemaMeta } from "./openclaw-agent-db-metadata.js";
 import { isSameOpenClawAgentDatabasePath } from "./openclaw-agent-db.paths.js";
 import type { OpenClawStateDatabase } from "./openclaw-state-db-contract.js";
 import { assertOpenClawStateDatabaseForMaintenance } from "./openclaw-state-db-maintenance.js";
@@ -133,16 +134,12 @@ function assertEmptySentinelDatabase(
   agentId: string,
 ): void {
   assertSqliteIntegrity(database, pathname);
-  const meta = database
-    .prepare("SELECT meta_key, role, agent_id, schema_version FROM schema_meta")
-    .all();
+  const meta = readExistingAgentSchemaMeta(database);
   if (
-    meta.length !== 1 ||
-    meta[0]?.meta_key !== "primary" ||
-    meta[0]?.role !== "agent" ||
-    meta[0]?.agent_id !== agentId ||
-    typeof meta[0]?.schema_version !== "number" ||
-    meta[0].schema_version > OPENCLAW_AGENT_SCHEMA_VERSION
+    meta?.role !== "agent" ||
+    meta.agentId !== agentId ||
+    meta.schemaVersion === null ||
+    meta.schemaVersion > OPENCLAW_AGENT_SCHEMA_VERSION
   ) {
     throw new Error("unrecognized agent database metadata; manual recovery required");
   }

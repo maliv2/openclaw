@@ -834,23 +834,25 @@ it.each([
   if (fixture.kernelSource) {
     sources.set(fixture.kernelFile, fixture.kernelSource);
   }
-  const inspect = () =>
+  const inspectProfileChain = () =>
     inspectDatabaseWorkerBoundaries(
       process.cwd(),
       sources,
       () => false,
       (file) => (file === fixture.workerFile ? "W" : undefined),
     );
-  expect(inspect().nonRuntimeOperations.get(fixture.kernelFile)?.get(fixture.kernel)).toBe("W");
+  expect(
+    inspectProfileChain().nonRuntimeOperations.get(fixture.kernelFile)?.get(fixture.kernel),
+  ).toBe("W");
 
   sources.set(
     "src/gateway/handler.ts",
     `import { ${fixture.entry} } from '../state/${fixture.entryFile.split("/").at(-1)!.replace(".ts", ".js")}';
       export function handle() { return ${fixture.entry}(); }`,
   );
-  expect(inspect().nonRuntimeOperations.get(fixture.kernelFile)?.has(fixture.kernel)).not.toBe(
-    true,
-  );
+  expect(
+    inspectProfileChain().nonRuntimeOperations.get(fixture.kernelFile)?.has(fixture.kernel),
+  ).not.toBe(true);
 });
 
 it.each([

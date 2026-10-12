@@ -968,13 +968,14 @@ describe("createGatewayKernel", () => {
       } finally {
         try {
           flushDiagnosticsTimeline();
-          await state.cleanup();
-        } finally {
           if (capturedLoadedPluginRegistry) {
             restoreActivePluginRegistrySnapshot(capturedLoadedPluginRegistry);
           }
           prematureCleanupCalls = capturedRegistryCleanup.mock.calls.length;
           restoreActivePluginRegistrySnapshot(originalPluginRegistry);
+          await waitForPluginRegistryRetirement(ambientRegistry);
+        } finally {
+          await state.cleanup();
         }
       }
     }

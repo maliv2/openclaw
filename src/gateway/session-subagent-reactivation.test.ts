@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as acpMetadata from "../acp/runtime/session-meta-readonly.js";
 import { upsertAcpSessionMeta } from "../acp/runtime/session-meta-write.js";
+import { setRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
 import { upsertSessionEntryCore } from "../config/sessions/session-accessor.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 
@@ -78,6 +79,7 @@ describe("reactivateCompletedSubagentSession", () => {
       async (state) => {
         const cfg = { agents: { ownership: "explicit" as const, entries: { main: {} } } };
         await state.writeConfig(cfg);
+        setRuntimeConfigSnapshot(cfg, cfg);
         const sessionKey = "agent:main:subagent:acp-followup";
         const scope = { cfg, agentId: "main", sessionKey, env: state.env };
         let entry = await upsertSessionEntryCore(scope, {

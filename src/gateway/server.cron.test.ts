@@ -10,6 +10,8 @@ import { createDeferred, withinTest } from "../../test/helpers/promise.js";
 import { resetConfigRuntimeState } from "../config/config.js";
 import type * as CronDelivery from "../cron/delivery.js";
 import { readCronRunRecordsForTests } from "../cron/run-history.test-support.js";
+import { captureCronSchedulerWakeForTest } from "../cron/service/scheduler-actor.test-support.js";
+import * as cronServiceState from "../cron/service/state.js";
 import { loadCronStore, saveCronStore } from "../cron/store.js";
 import type { GuardedFetchOptions } from "../infra/net/fetch-guard.js";
 import { withPluginRuntimeGatewayRequestScope } from "../plugins/runtime/gateway-request-scope.js";
@@ -194,21 +196,36 @@ async function setupCronTestRun(
 
 async function createDirectCronState(params?: {
   broadcast?: (event: string, payload: unknown) => void;
-}): Promise<DirectCronState> {
+}): Promise<DirectCronState & { serviceState: cronServiceState.CronServiceState }> {
   resetConfigRuntimeState();
   const [{ getRuntimeConfig }, { buildGatewayCronService }] = await Promise.all([
     import("../config/config.js"),
     import("./server-cron.js"),
   ]);
   const schedulerClock = createGatewaySchedulerClock(Date.now());
-  const cronState = {
-    schedulerClock,
-    ...buildGatewayCronService({
+  let serviceState: cronServiceState.CronServiceState | undefined;
+  const createState = cronServiceState.createCronServiceState;
+  const capture = vi
+    .spyOn(cronServiceState, "createCronServiceState")
+    .mockImplementationOnce((deps) => {
+      serviceState = createState(deps);
+      return serviceState;
+    });
+  let gatewayState: ReturnType<typeof buildGatewayCronService>;
+  try {
+    gatewayState = buildGatewayCronService({
       scheduler: createTestGatewayScheduler(schedulerClock.clock),
       cfg: getRuntimeConfig(),
       deps: {} as never,
       broadcast: params?.broadcast ?? vi.fn(),
-    }),
+    });
+  } finally {
+    capture.mockRestore();
+  }
+  const cronState = {
+    ...gatewayState,
+    schedulerClock,
+    serviceState: expectDefined(serviceState, "direct cron service state"),
     getRuntimeConfig,
   };
   expectDefined(activeCronRun, "cron setup").cronState = cronState;
@@ -624,19 +641,21 @@ describe("gateway server cron", () => {
     });
     const autoJobId = expectCronJobIdFromResponse(autoRes);
 
-    await cronState.cron.start();
+    const { wake } = await captureCronSchedulerWakeForTest(() => cronState.cron.start());
     const deferred = expectDefined(
       (await loadCronStore(cronState.storePath)).jobs.find((job) => job.id === autoJobId),
       "durable startup receiver",
     );
     const deferredAtMs = expectDefined(deferred.state.nextRunAtMs, "deferred startup slot");
     expect(deferredAtMs).toBe(startupAtMs + 120_000);
-    await cronState.schedulerClock.advanceTo(deferredAtMs - 1);
+    cronState.schedulerClock.setTime(deferredAtMs - 1);
+    await wake(cronState.serviceState);
     expect(readCronRunRecordsForTests(autoJobId)).toEqual([]);
     const autoFinished = events.wait(
       (payload) => payload?.jobId === autoJobId && payload?.action === "finished",
     );
-    await cronState.schedulerClock.advanceTo(deferredAtMs);
+    cronState.schedulerClock.setTime(deferredAtMs);
+    await wake(cronState.serviceState);
     await expect(autoFinished).resolves.toMatchObject({ jobId: autoJobId, status: "ok" });
     const autoEntries = (await directCronReq(cronState, "cron.runs", { id: autoJobId, limit: 10 }))
       .payload as { entries?: Array<{ jobId?: unknown }> } | undefined;

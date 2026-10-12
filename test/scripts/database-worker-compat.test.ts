@@ -3,15 +3,15 @@ import { inspectDatabaseWorkerBoundaries } from "../../scripts/lib/database-work
 
 const legacyFile = "src/plugin-sdk/sqlite-runtime-legacy.ts";
 const secondFile = "src/sessions/session-upstream-links.ts";
-const first = "executeSqliteQueryTakeFirstSyncLegacy";
+const first = "sdkExecuteSqliteQueryTakeFirstSync";
 const second = "deleteSessionUpstreamLink";
 const legacy = `
-/** @deprecated Use the worker API; removed in the next SDK major. */
+/** @deprecated Use the worker API; removal follows a stable deprecation window. */
 export function ${first}() { return 1; }
 `;
 const owner = `
 import { ${first} } from '../plugin-sdk/sqlite-runtime-legacy.js';
-/** @deprecated Use the worker API; removed in the next SDK major. */
+/** @deprecated Use the worker API; removal follows a stable deprecation window. */
 export function ${second}() { return ${first}(); }
 `;
 

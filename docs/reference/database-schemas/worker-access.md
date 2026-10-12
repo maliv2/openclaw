@@ -94,14 +94,32 @@ ownership; ordinary readers do not poll for foreign commits.
 
 Transcript readers retain bounded hot/cold facts under the existing session write
 receipts. Archive, restore, session deletion, and native writes invalidate those
-facts; an unknown receipt falls back to the durable marker. Consecutive read pages
-reuse the fact, while an already-open snapshot keeps its own local result.
+facts; an unknown receipt falls back to the durable marker. Each new transcript
+read snapshot selects the indexed cold marker before consuming transcript rows.
+Repeated reads inside that snapshot reuse its local fact; a committed-write receipt
+captured before the snapshot cannot replace that initial marker read.
 Participant projections carry an autocommit read into the metadata CAS owner's
 unchanged immediate write transaction. Ordinary readers establish their own native
 snapshot. Concurrent participant updates remain independent of metadata CAS. These
 caches change no schema, retention, stored format, or update behavior.
 
 ## Session and ancillary worker operations
+
+Bounded transcript hydration retains its result in the existing session actor
+replica. Complete active paths advance from committed append receipts, including
+the stored payload byte lengths; repeated reads and recent reply anchors can then
+use that replica without another history-worker request. Incomplete windows,
+capacity overflow, rewrites, rewinds, compaction, archive changes, and deletion
+return to the canonical reader. The projection shares the actor's eviction and
+write-receipt invalidation lifecycle and does not change schemas, stored formats,
+retention, or update behavior.
+
+Metadata-only lifecycle commits publish the resident actor's updated entry while
+retaining its transcript. Participant changes keep transcript payloads private
+until the next actor snapshot confirms the same transcript version. Reply
+delivery can read committed anchor facts after the actor handle is released;
+the delivery caller still owns current authorization. Reset boundaries, session
+replacement, and transcript edits continue to invalidate retained context.
 
 Parent forks use the existing session-entry worker for both transcript copying
 and child-row commits. Internal fork transformations are data patches, not native
@@ -393,10 +411,9 @@ grant. Entry-only binding mutations carry `entryCurrent` through existing writer
 admission. Host callbacks check live channel/run facts among those matches, so a
 finishing publisher can yield to a recorded parent without losing a valid title
 update. `source.assertScopeCurrent()` checks only host lifetime and physical source
-custody; it does not replace an awaited effect check. The deprecated
-`captureSessionEntryCurrentCheck` keeps its released synchronous callbacks, warns
-on use, and is scheduled for removal at the next Plugin SDK major. Incognito uses
-its existing native callback route.
+custody; it does not replace an awaited effect check. The never-stable
+`captureSessionEntryCurrentCheck` facade and its synchronous callback preparation
+path are removed. Incognito uses its existing native callback route.
 
 History readers can borrow existing physical and canonical admission without an
 open host reader. The receiving scope checks its actual file and the live receipt;
@@ -3399,6 +3416,11 @@ contracts. No schema, retention, durability, or update migration is required.
 
 Embedded writer claims, live-model-switch consolidation, and pending-final delivery
 preparation, settlement, and cleanup explicitly select that worker patch path.
+After the reply dispatcher finishes delivery, terminal settlement and pending-final
+cleanup reduce the same entry in one worker transaction. Suppression uses the same
+combined operation. The lower-level delivery receipt still commits before queue
+acknowledgment; it does not clear recovery custody. Custom delivery paths retain
+their existing cleanup operation.
 Callback-based reducers prepare outside the transaction; the worker rereads the selected
 rows before applying the patch and publishes acknowledged results before releasing
 the existing writer queue. Uncertain writes never replay. Durable lifecycle start
@@ -4988,6 +5010,14 @@ the write remain queued for the next flush. Incognito and maintenance scopes and
 already executing workers keep their native kernel. Event bytes, ordering,
 retention limits, schemas, and update behavior are unchanged.
 
+Successful embedded attempts defer their final diagnostic flush to the logical-turn
+lifecycle owner, which appends the accepted `session.ended` event to the same batch.
+Failed attempts and retry boundaries still flush diagnostic progress; replacing an
+attempt flushes its diagnostics without a terminal event. Final lifecycle completion
+joins those discarded-attempt flushes. A rolled-back batch remains retryable as a
+whole, using the existing recorder receipt and rollback handling. Transcript
+persistence remains a separate durable checkpoint.
+
 Disk-budget historical discovery reads reference, recent-history, and admitted-key
 protection in the existing maintenance read worker. It returns candidate IDs;
 the host captures live admission identities and rechecks their protection before
@@ -5231,6 +5261,13 @@ ownership while it is stopped. CLI history's released synchronous execution
 guard remains a separate compatibility contract.
 It must cover every supported writer before replacing live authority reads. See
 [retained final-authority guards](#retained-final-authority-guards).
+
+Workshop change notices read source generation metadata through the existing entry
+worker after resolving their delivery route. The existing ordered read keeps its
+writer admission through one generation comparison and synchronous undo-event enqueue,
+so reset sessions remain untouched. Durable delivery and transcript append
+retain their own effect-time generation checks. Delivery errors record a warning
+without rereading the generation solely to classify the log message.
 
 Raw and visible transcript deltas, watermarks, pre-reset Memory capture, and final context
 validation borrow an already-prepared agent executor when one exists for the

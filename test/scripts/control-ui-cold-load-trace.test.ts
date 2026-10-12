@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   mapColdLoadCpuProfile,
+  prepareColdLoadTraceEvent,
   summarizeColdLoadTrace,
   summarizeCpuProfile,
   type ColdLoadCpuProfile,
@@ -22,6 +23,26 @@ function event(
 }
 
 describe("cold-load trace accounting", () => {
+  it("prepares numeric CDP envelopes, including unnamed end events", () => {
+    expect(
+      prepareColdLoadTraceEvent({
+        name: "Layout",
+        ph: "B",
+        ts: 10,
+        pid: 7,
+        tid: 1,
+        args: { beginData: { stackTrace: [{ functionName: "measure" }] } },
+      }),
+    ).toMatchObject({ name: "Layout", args: { beginData: { stackTrace: [{}] } } });
+    expect(prepareColdLoadTraceEvent({ ph: "E", ts: 20, pid: 7, tid: 1 })).toMatchObject({
+      ph: "E",
+      ts: 20,
+    });
+    expect(() =>
+      prepareColdLoadTraceEvent({ name: "Layout", ph: "X", ts: "10", pid: 7, tid: 1 }),
+    ).toThrow("Invalid Chrome trace event envelope");
+  });
+
   it("unions overlapping main-thread tasks inside the navigation window", () => {
     const trace = [
       event("thread_name", "M", 0, { args: { name: "CrRendererMain" } }),

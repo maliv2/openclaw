@@ -19,9 +19,9 @@ import {
 import { createControlUiTeamScaleFixture } from "../ui/src/test-helpers/control-ui-team-scale-fixture.ts";
 import {
   mapColdLoadCpuProfile,
+  prepareColdLoadTraceEvent,
   summarizeColdLoadTrace,
   summarizeCpuProfile,
-  type ColdLoadTraceEvent,
 } from "./lib/control-ui-cold-load-trace.ts";
 
 const { values } = parseArgs({
@@ -198,8 +198,8 @@ try {
   await page.locator('aside.sidebar[data-snapshot-saved="true"]').waitFor();
   for (let run = 0; run < runs; run++) {
     const cdp = await context.newCDPSession(page);
-    const trace: ColdLoadTraceEvent[] = [];
-    cdp.on("Tracing.dataCollected", (data) => trace.push(...data.value));
+    const rawTrace: unknown[] = [];
+    cdp.on("Tracing.dataCollected", (data) => rawTrace.push(...data.value));
     await cdp.send("Profiler.enable");
     await cdp.send("Profiler.setSamplingInterval", { interval: 1000 });
     await cdp.send("Profiler.start");
@@ -221,59 +221,63 @@ try {
     await page.screenshot({ path: path.join(artifactDir, `run-${run + 1}.png`) });
     await writeFile(
       path.join(artifactDir, `run-${run + 1}.trace.json`),
-      JSON.stringify({ traceEvents: trace }),
+      JSON.stringify({ traceEvents: rawTrace }),
     );
     await writeFile(
       path.join(artifactDir, `run-${run + 1}.cpuprofile`),
       JSON.stringify(profile.profile),
     );
-    const screenshots = trace.filter((event) => event.name === "Screenshot");
-    const visual = await page.evaluate(
-      async (frames) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 344;
-        canvas.height = 236;
-        const ctx = canvas.getContext("2d")!;
-        let previous: Uint8ClampedArray | undefined;
-        const changes: number[] = [];
-        for (const frame of frames) {
-          const image = new Image();
-          image.src = `data:image/jpeg;base64,${frame.data}`;
-          await image.decode();
-          ctx.drawImage(image, 0, 0, 344, 236);
-          const pixels = ctx.getImageData(0, 0, 344, 236).data;
-          if (previous) {
-            let changed = 0;
-            for (let i = 0; i < pixels.length; i += 4) {
-              if (
-                Math.max(
-                  Math.abs(pixels[i] - previous[i]),
-                  Math.abs(pixels[i + 1] - previous[i + 1]),
-                  Math.abs(pixels[i + 2] - previous[i + 2]),
-                ) >= 32
-              ) {
-                changed++;
-              }
-            }
-            if (changed / (344 * 236) >= 0.004) {
-              changes.push(frame.ts);
+    const trace = rawTrace.map(prepareColdLoadTraceEvent);
+    const screenshots = trace.flatMap((event) =>
+      event.name === "Screenshot" && event.args?.snapshot
+        ? [{ ts: event.ts, data: event.args.snapshot }]
+        : [],
+    );
+    const visual = await page.evaluate(async (frames) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 344;
+      canvas.height = 236;
+      const ctx = canvas.getContext("2d")!;
+      let previous: DataView | undefined;
+      let lastChange: number | undefined;
+      let significantFrames = 0;
+      let transitionGroups = 0;
+      for (const frame of frames) {
+        const image = new Image();
+        image.src = `data:image/jpeg;base64,${frame.data}`;
+        await image.decode();
+        ctx.drawImage(image, 0, 0, 344, 236);
+        const bytes = ctx.getImageData(0, 0, 344, 236).data;
+        const pixels = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        if (previous) {
+          let changed = 0;
+          for (let i = 0; i < pixels.byteLength; i += 4) {
+            if (
+              Math.max(
+                Math.abs(pixels.getUint8(i) - previous.getUint8(i)),
+                Math.abs(pixels.getUint8(i + 1) - previous.getUint8(i + 1)),
+                Math.abs(pixels.getUint8(i + 2) - previous.getUint8(i + 2)),
+              ) >= 32
+            ) {
+              changed++;
             }
           }
-          previous = pixels;
+          if (changed / (344 * 236) >= 0.004) {
+            significantFrames++;
+            if (lastChange === undefined || frame.ts - lastChange > 100_000) {
+              transitionGroups++;
+            }
+            lastChange = frame.ts;
+          }
         }
-        return {
-          frames: frames.length,
-          significantFrames: changes.length,
-          transitionGroups: changes.filter(
-            (time, index) => index === 0 || time - changes[index - 1] > 100_000,
-          ).length,
-        };
-      },
-      screenshots.map((event) => ({
-        ts: event.ts,
-        data: event.args!.snapshot!,
-      })),
-    );
+        previous = pixels;
+      }
+      return {
+        frames: frames.length,
+        significantFrames,
+        transitionGroups,
+      };
+    }, screenshots);
     const mapped = await mapColdLoadCpuProfile(profile.profile, {
       assetBaseUrl: new URL("assets/", server.baseUrl).href,
       assetDirectory: path.join(artifactDir, "ui", "assets"),

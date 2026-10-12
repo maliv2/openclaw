@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { SourceMap } from "node:module";
 import path from "node:path";
+import { asRecord } from "@openclaw/normalization-core/record-coerce";
 
 export type ColdLoadTraceEvent = {
-  name: string;
+  name?: string;
   ph: string;
   ts: number;
   dur?: number;
@@ -16,6 +17,49 @@ export type ColdLoadTraceEvent = {
     beginData?: { stackTrace?: readonly unknown[] };
   };
 };
+
+/** CDP leaves trace dictionaries untyped; raw captures retain their other fields. */
+export function prepareColdLoadTraceEvent(value: unknown): ColdLoadTraceEvent {
+  const event = asRecord(value);
+  if (
+    !event ||
+    (event.name !== undefined && typeof event.name !== "string") ||
+    typeof event.ph !== "string" ||
+    typeof event.ts !== "number" ||
+    typeof event.pid !== "number" ||
+    typeof event.tid !== "number" ||
+    (event.dur !== undefined && typeof event.dur !== "number")
+  ) {
+    throw new Error("Invalid Chrome trace event envelope");
+  }
+  const args = asRecord(event.args);
+  const data = asRecord(args?.data);
+  const begin = asRecord(args?.beginData);
+  const stackTrace = begin?.stackTrace;
+  return {
+    name: event.name,
+    ph: event.ph,
+    ts: event.ts,
+    pid: event.pid,
+    tid: event.tid,
+    dur: event.dur,
+    args: args
+      ? {
+          name: typeof args.name === "string" ? args.name : undefined,
+          snapshot: typeof args.snapshot === "string" ? args.snapshot : undefined,
+          data: data
+            ? {
+                isLoadingMainFrame:
+                  typeof data.isLoadingMainFrame === "boolean"
+                    ? data.isLoadingMainFrame
+                    : undefined,
+              }
+            : undefined,
+          beginData: Array.isArray(stackTrace) ? { stackTrace } : undefined,
+        }
+      : undefined,
+  };
+}
 
 export type ColdLoadCpuFrame = {
   functionName: string;
@@ -110,7 +154,7 @@ export async function mapColdLoadCpuProfile(
 
 type Interval = { start: number; end: number; forced: boolean };
 
-function isTask(name: string): boolean {
+function isTask(name: string | undefined): boolean {
   return name === "RunTask" || name === "ThreadControllerImpl::RunTask";
 }
 

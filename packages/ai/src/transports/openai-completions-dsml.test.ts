@@ -203,6 +203,34 @@ describe("openai completions DSML", () => {
     expect(JSON.stringify(events)).not.toContain("DSML");
   });
 
+  it.each(["calls", "tool_calls"])(
+    "hides DSML %s in direct mode without recovering tools",
+    async (kind) => {
+      const model = createDeepSeekCompletionsModel();
+      const output = createAssistantOutput(model);
+      const events: CapturedStreamEvent[] = [];
+      const content =
+        `before <｜｜DSML｜｜ ${kind}><｜｜DSML｜｜ invoke name="write">` +
+        '<｜｜DSML｜｜ parameter name="path" string="true">/tmp/unexecuted</｜｜DSML｜｜ parameter>' +
+        `</｜｜DSML｜｜ invoke></｜｜DSML｜｜ ${kind}> after`;
+
+      await processCompletionsStream(
+        streamChunks([
+          ...Array.from(content, (char) => makeCompletionsChunk({ content: char })),
+          makeCompletionsChunk({}, "stop"),
+        ]),
+        output,
+        model,
+        { push: (event) => events.push(event as CapturedStreamEvent) },
+        { mode: "direct", beforeContentBlock() {} },
+      );
+
+      expect(output.content).toEqual([{ type: "text", text: "before  after" }]);
+      expect(output.stopReason).toBe("stop");
+      expect(JSON.stringify(events)).not.toContain("DSML");
+    },
+  );
+
   it.each([
     { name: "__proto__", value: "scalar value", duplicate: true },
     { name: "text", value: "", duplicate: true },

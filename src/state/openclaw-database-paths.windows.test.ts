@@ -103,7 +103,9 @@ describe("OpenClaw database paths on Windows", () => {
       const inspect = () =>
         readUpdateStateSchemaVersions({ stateDir: env.OPENCLAW_STATE_DIR, config: {}, env });
       addAlias();
-      expect(noteDoctorAgentDatabasePathHealth({ env, shouldRepair: true })).toEqual([]);
+      expect(await noteDoctorAgentDatabasePathHealth({ env, cfg: {}, shouldRepair: true })).toEqual(
+        [],
+      );
       expect(state.db.prepare("SELECT COUNT(*) AS count FROM agent_databases").get()).toEqual({
         count: 1,
       });
@@ -115,15 +117,16 @@ describe("OpenClaw database paths on Windows", () => {
       addAlias();
       const mixedBaseline = await inspect();
       const run = createUpdateRun({ trigger: "cli" }, { env });
-      expect(noteDoctorAgentDatabasePathHealth({ env, shouldRepair: true })).toEqual([
-        expect.stringContaining(`update ${run.runId} is in progress`),
-      ]);
+      expect(await noteDoctorAgentDatabasePathHealth({ env, cfg: {}, shouldRepair: true })).toEqual(
+        [expect.stringContaining(`update ${run.runId} is in progress`)],
+      );
       expect(
         updateStateSchemaVersionsMatch(mixedBaseline, await inspect(), { sharedPath: state.path }),
       ).toBe(true);
       finishUpdateRun(run.runId, { status: "succeeded" }, { env });
       expect(
-        noteDoctorAgentDatabasePathHealth({
+        await noteDoctorAgentDatabasePathHealth({
+          cfg: {},
           env: { ...env, OPENCLAW_UPDATE_PARENT_SUPPORTS_DOCTOR_CONFIG_WRITE: "1" },
           shouldRepair: true,
         }),

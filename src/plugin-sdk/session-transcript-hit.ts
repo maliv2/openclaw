@@ -59,7 +59,7 @@ export async function loadCombinedSessionStoreForGatewayAsync(
 
 function publicSessionStore(result: ReturnType<typeof loadGatewaySessionStore>) {
   return {
-    storePath: result.storePath,
+    storePath: result.storePath ?? "(multiple)",
     // Plugin search hits can be re-persisted into durable transcripts, so the
     // SDK cross-session view must never expose incognito content.
     store: Object.fromEntries(

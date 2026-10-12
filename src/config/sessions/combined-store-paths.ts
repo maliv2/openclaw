@@ -20,18 +20,18 @@ export function isStorePathTemplate(store?: string): boolean {
   return typeof store === "string" && store.includes("{agentId}");
 }
 
-export function resolveCombinedStorePath(paths: string[], storeConfig?: string): string {
+export function resolveCombinedStorePath(paths: string[], storeConfig?: string): string | null {
   return paths.length === 1
     ? expectDefined(paths[0], "store path at 0")
     : typeof storeConfig === "string" && storeConfig.trim()
       ? storeConfig.trim()
-      : "(multiple)";
+      : null;
 }
 
 export function resolveCombinedDatabasePath(
   targets: readonly SessionStoreTarget[],
   physicalTargets: ReadonlyMap<string, SessionStoreTarget>,
-): string {
+): string | null {
   const paths = [
     ...new Set(
       targets.map(
@@ -40,7 +40,7 @@ export function resolveCombinedDatabasePath(
       ),
     ),
   ];
-  return paths.length === 1 ? expectDefined(paths[0], "database path at 0") : "(multiple)";
+  return paths.length === 1 ? expectDefined(paths[0], "database path at 0") : null;
 }
 
 export function discoveryReadOptions(discovery?: GatewaySessionStoreDiscovery) {

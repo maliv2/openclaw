@@ -1,18 +1,26 @@
 import { note } from "../../packages/terminal-core/src/note.js";
-import { repairOpenClawAgentDatabasePathAliases } from "../state/openclaw-agent-db-path-repair.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { formatErrorMessage } from "../infra/errors.js";
+import {
+  repairOpenClawAgentDatabasePathAliases,
+  repairOpenClawSentinelAgentDatabasePaths,
+  type AgentDatabasePathRepairReport,
+} from "../state/openclaw-agent-db-path-repair.js";
 import { invalidateRegisteredAgentDatabasesMemo } from "../state/openclaw-agent-db-registry-listing.js";
 import { runOpenClawStateWriteTransaction } from "../state/openclaw-state-db.js";
+import { withDoctorSqliteMaintenanceLock } from "./doctor-sqlite-maintenance-lock.js";
 import { isUpdateDoctorLintPass } from "./doctor/shared/update-phase.js";
 
 /** Repair inventory aliases only before an updater captures its exact-path baseline. */
-export function noteDoctorAgentDatabasePathHealth(params: {
+export async function noteDoctorAgentDatabasePathHealth(params: {
   env: NodeJS.ProcessEnv;
   shouldRepair: boolean;
-}): string[] {
-  if (!params.shouldRepair || process.platform !== "win32") {
+  cfg: OpenClawConfig;
+}): Promise<string[]> {
+  if (!params.shouldRepair) {
     return [];
   }
-  const report = runOpenClawStateWriteTransaction(
+  const report: AgentDatabasePathRepairReport = runOpenClawStateWriteTransaction(
     (database) =>
       isUpdateDoctorLintPass(params.env)
         ? {
@@ -25,10 +33,26 @@ export function noteDoctorAgentDatabasePathHealth(params: {
     { env: params.env },
     { operationLabel: "doctor.agent-database-paths" },
   );
+  if (report.hasSentinelPaths) {
+    try {
+      const repaired = await withDoctorSqliteMaintenanceLock({
+        env: params.env,
+        operation: "agent database path repair",
+        run: () => repairOpenClawSentinelAgentDatabasePaths(params.cfg, params.env),
+      });
+      report.repaired += repaired.repaired;
+      report.warnings.push(...repaired.warnings);
+      report.backupDirectory = repaired.backupDirectory;
+    } catch (error) {
+      report.warnings.push(
+        `Agent database path repair did not finish: ${formatErrorMessage(error)}`,
+      );
+    }
+  }
   if (report.repaired > 0) {
     invalidateRegisteredAgentDatabasesMemo({ env: params.env });
     note(
-      `Repaired ${report.repaired} agent database path registration(s), preserving the newest facts.`,
+      `Repaired ${report.repaired} agent database path registration(s).${report.backupDirectory ? ` Backup: ${report.backupDirectory}` : ""}`,
       "Doctor changes",
     );
   }

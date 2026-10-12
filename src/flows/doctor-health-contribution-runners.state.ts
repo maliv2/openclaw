@@ -114,9 +114,10 @@ export async function runChannelIngressDeadLettersHealth(): Promise<void> {
 export async function runStateIntegrityHealth(ctx: DoctorHealthFlowContext): Promise<void> {
   const { noteDoctorAgentDatabasePathHealth } =
     await import("../commands/doctor-agent-database-paths.js");
-  const warnings = noteDoctorAgentDatabasePathHealth({
+  const warnings = await noteDoctorAgentDatabasePathHealth({
     env: ctx.env ?? process.env,
     shouldRepair: ctx.prompter.shouldRepair,
+    cfg: ctx.cfg,
   });
   if (warnings.length > 0) {
     ctx.updateWarnings ??= [];

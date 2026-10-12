@@ -535,9 +535,10 @@ export function applyGatewaySessionStoreAdmission(
 
 export type GatewayCombinedSessionStore = {
   diagnostics?: readonly string[];
-  durableStorePath?: string;
+  durableStorePath?: string | null;
   durableTargets: ReadonlyArray<{ agentId: string; storePath: string }>;
-  storePath: string;
+  /** An aggregate has no physical path; only presentation adapters may label it. */
+  storePath: string | null;
   store: Record<string, SessionEntry>;
   targetsBySessionKey: GatewayStoredSessionTargets;
 };
@@ -690,7 +691,7 @@ export function mergeCombinedSessionStore(
   const storePath =
     storeConfig && !isStorePathTemplate(storeConfig)
       ? incognitoStorePaths.length > 0
-        ? "(multiple)"
+        ? null
         : durableStorePath
       : resolveCombinedStorePath([...durableStorePaths, ...incognitoStorePaths], storeConfig);
   return {

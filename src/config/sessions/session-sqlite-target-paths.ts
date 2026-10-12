@@ -9,6 +9,9 @@ export function resolveUnsuffixedSqliteTargetFromSessionStorePath(storePath: str
   path: string;
   shared?: boolean;
 } {
+  if (path.basename(storePath.trim()) === "(multiple)") {
+    throw new Error("Multiple session stores do not identify a physical database path");
+  }
   const resolved = path.resolve(storePath);
   if (resolved.endsWith(".sqlite")) {
     const agentId = resolveAgentIdFromSqliteDatabasePath(resolved);

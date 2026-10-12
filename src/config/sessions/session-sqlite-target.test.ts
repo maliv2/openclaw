@@ -7,6 +7,17 @@ import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target
 
 describe("resolveSqliteTargetFromSessionStorePath", () => {
   const tempDirs = useAutoCleanupTempDirTracker(afterEach);
+  it.each(["(multiple)", path.resolve("(multiple)")])(
+    "rejects the aggregate store label %s before resolving an agent database",
+    (storePath) => {
+      expect(() =>
+        resolveSqliteTargetFromSessionStorePath(storePath, {
+          agentId: "ops",
+          registeredDatabases: [],
+        }),
+      ).toThrow("Multiple session stores do not identify a physical database path");
+    },
+  );
   it("assigns a new exact SQLite locator to the configured default without caller capture", () => {
     const databasePath = path.resolve("tmp", "stores", "new-shared.sqlite");
 

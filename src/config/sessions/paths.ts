@@ -382,6 +382,9 @@ export function resolveSessionStorePathWithContext(
     const agentId = normalizeAgentId(opts.agentId);
     return path.join(resolveSessionTranscriptsDirForAgent(agentId, env, homedir), "sessions.json");
   }
+  if (store.trim() === MULTI_STORE_PATH_SENTINEL) {
+    throw new Error("Multiple session stores do not identify a physical database path");
+  }
   let expandedStore = store;
   if (expandedStore.includes("{agentId}")) {
     if (!opts?.agentId?.trim()) {

@@ -31,7 +31,7 @@ it.each([
   "filters incognito rows from the %s plugin cross-session view",
   async (_label, load) => {
     const snapshot = {
-      storePath: "(multiple)",
+      storePath: null,
       store: {
         "agent:main:dashboard:visible": { sessionId: "visible", updatedAt: 1 },
         "agent:main:dashboard:incognito-private": {
@@ -44,8 +44,11 @@ it.each([
     loadGatewaySessionStore.mockReturnValue(snapshot);
     loadGatewaySessionStoreAsync.mockResolvedValue(snapshot);
 
-    expect((await load({})).store).toEqual({
-      "agent:main:dashboard:visible": { sessionId: "visible", updatedAt: 1 },
+    expect(await load({})).toEqual({
+      storePath: "(multiple)",
+      store: {
+        "agent:main:dashboard:visible": { sessionId: "visible", updatedAt: 1 },
+      },
     });
   },
 );

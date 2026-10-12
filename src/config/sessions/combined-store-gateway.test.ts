@@ -58,11 +58,12 @@ it("lists admitted sessions across cached targets while preserving a refused dat
         { sessionId: `${agentId}-session`, updatedAt: 1 },
       );
     }
-    expect(
-      Object.keys(
-        loadCombinedSessionStoreForGatewayCore(cfg, { configuredAgentsOnly: true }).store,
-      ),
-    ).toHaveLength(2);
+    const combinedStores = loadCombinedSessionStoreForGatewayCore(cfg, {
+      configuredAgentsOnly: true,
+    });
+    expect(Object.keys(combinedStores.store)).toHaveLength(2);
+    expect(combinedStores.storePath).toBeNull();
+    expect(combinedStores.durableStorePath).toBeNull();
     const copyPath = openOpenClawAgentDatabase({ agentId: "cleaner" }).path;
     closeOpenClawAgentDatabasesForTest();
     const { DatabaseSync } = requireNodeSqlite();

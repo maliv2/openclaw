@@ -37,7 +37,7 @@ export type ResolvedGatewaySessionStoreTargets = {
   configuredAgentIds?: ReadonlySet<string>;
   defaultAgentId: string;
   diagnostics: readonly string[];
-  durableStorePath?: string;
+  durableStorePath?: string | null;
   durableTargets: ReadonlyArray<SessionStoreTarget>;
   incognitoTargets: ReadonlyArray<SessionStoreTarget>;
   physicalTargets: ReadonlyMap<string, SessionStoreTarget>;

@@ -57,7 +57,9 @@ export async function mapColdLoadCpuProfile(
       }
       // Preview also serves relative entry assets beneath the deep-link path.
       const assetStart = url.pathname.lastIndexOf(base.pathname);
-      if (assetStart < 0) return node;
+      if (assetStart < 0) {
+        return node;
+      }
       const relative = decodeURIComponent(url.pathname.slice(assetStart + base.pathname.length));
       const file = path.resolve(directory, relative);
       if (!file.startsWith(`${directory}${path.sep}`)) {
@@ -73,8 +75,9 @@ export async function mapColdLoadCpuProfile(
               error !== null &&
               "code" in error &&
               error.code === "ENOENT"
-            )
+            ) {
               return null;
+            }
             throw error;
           },
         );
@@ -226,11 +229,16 @@ export function summarizeCpuProfile(
   const timedSamples = samples
     .map((id, index) => {
       const delta = deltas[index]!;
-      if (!Number.isFinite(delta))
+      if (!Number.isFinite(delta)) {
         throw new Error("Cold-load CPU profile has an invalid sample time");
-      if (delta < 0) outOfOrderSamples++;
+      }
+      if (delta < 0) {
+        outOfOrderSamples++;
+      }
       timestamp += delta;
-      if (timestamp < 0) throw new Error("Cold-load CPU sample precedes the profile start");
+      if (timestamp < 0) {
+        throw new Error("Cold-load CPU sample precedes the profile start");
+      }
       return { id, timestamp };
     })
     .toSorted((left, right) => left.timestamp - right.timestamp);

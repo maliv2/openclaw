@@ -25,11 +25,11 @@ export function installColdLoadProbes(input: {
     if (prototype && !patched.has(prototype)) {
       patched.add(prototype);
       const performUpdate = prototype.performUpdate;
-      prototype.performUpdate = function () {
+      prototype.performUpdate = function (...args: unknown[]) {
         const stats = updates.get(this.localName) ?? { count: 0, ms: 0 };
         const started = performance.now();
         try {
-          return performUpdate.apply(this, arguments);
+          return performUpdate.apply(this, args);
         } finally {
           stats.count++;
           stats.ms += performance.now() - started;
@@ -56,7 +56,9 @@ export function installColdLoadProbes(input: {
               bytes: new TextEncoder().encode(data).length,
               at: performance.now(),
             });
-            if (frame.method === "connect") instanceId = frame.params?.client?.instanceId;
+            if (frame.method === "connect") {
+              instanceId = frame.params?.client?.instanceId;
+            }
             if (frame.method === "sessions.catalog.list") {
               progressId = frame.params?.progressId;
               if (!eventsStarted) {
@@ -86,8 +88,9 @@ export function installColdLoadProbes(input: {
         send(data);
       };
       socket.dispatchEvent = (event) => {
-        if (!(event instanceof MessageEvent) || typeof event.data !== "string")
+        if (!(event instanceof MessageEvent) || typeof event.data !== "string") {
           return dispatch(event);
+        }
         const frame = JSON.parse(event.data);
         // A single wire delivers one message task at a time, including concurrent RPC replies.
         nextFrameAt = Math.max(performance.now() + input.latencyMs, nextFrameAt + input.frameGapMs);
@@ -117,8 +120,9 @@ export function installColdLoadProbes(input: {
   });
   const longTasks: Array<{ start: number; duration: number }> = [];
   const observer = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries())
+    for (const entry of list.getEntries()) {
       longTasks.push({ start: entry.startTime, duration: entry.duration });
+    }
   });
   observer.observe({ type: "longtask", buffered: true });
   Reflect.set(window, "__coldLoad", {

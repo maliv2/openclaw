@@ -34,8 +34,9 @@ const { values } = parseArgs({
   },
 });
 const sidebarView = values["sidebar-view"];
-if (sidebarView !== "sessions" && sidebarView !== "online")
+if (sidebarView !== "sessions" && sidebarView !== "online") {
   throw new Error("Expected sidebar-view sessions or online");
+}
 const runs = Number(values.runs);
 const latencyMs = Number(values["latency-ms"]);
 const frameGapMs = Number(values["frame-gap-ms"]);
@@ -61,7 +62,9 @@ await new Promise<void>((resolve, reject) => {
   sandbox.listen(0, "127.0.0.1", resolve);
 });
 const address = sandbox.address();
-if (!address || typeof address === "string") throw new Error("Sandbox did not bind");
+if (!address || typeof address === "string") {
+  throw new Error("Sandbox did not bind");
+}
 const fixture = createControlUiTeamScaleFixture({
   baseUrl: server.baseUrl,
   sandboxUrl: buildSandboxHostPath({ blockDescendantFrames: true }),
@@ -96,7 +99,9 @@ try {
       error.stack?.includes("at <anonymous>:3:15")
     ) {
       harnessWarnings.push(error.message);
-    } else errors.push(error.message);
+    } else {
+      errors.push(error.message);
+    }
   });
   await page.route("**/control-ui-config.json", (route) =>
     route.fulfill({ json: createControlUiMockBootstrapConfig(prepared.scenario) }),
@@ -111,7 +116,9 @@ try {
   });
   await page.addInitScript(
     ({ key, pins }) => {
-      if (window !== window.top) return;
+      if (window !== window.top) {
+        return;
+      }
       if (!localStorage.getItem(key)) {
         localStorage.setItem(
           key,
@@ -142,8 +149,9 @@ try {
         .nth(29)
         .waitFor({ state: "attached" });
       await page.locator('[data-sidebar-entry="plugin:team-scale-6/overview"]').waitFor();
-      if (sidebarView === "online")
+      if (sidebarView === "online") {
         await page.locator('[data-online-user-id="team-person-120"]').waitFor();
+      }
       await page
         .frameLocator(".board-widget__frame")
         .frameLocator("iframe")
@@ -183,7 +191,9 @@ try {
   await page.goto(url);
   await page.locator("#sidebar-session-owner-title").click();
   await page.locator('.sidebar-session-owner-filter [role="option"][data-value="all"]').click();
-  if (sidebarView === "online") await page.locator('[data-navigation-view="online"]').click();
+  if (sidebarView === "online") {
+    await page.locator('[data-navigation-view="online"]').click();
+  }
   await settle();
   await page.locator('aside.sidebar[data-snapshot-saved="true"]').waitFor();
   for (let run = 0; run < runs; run++) {
@@ -203,9 +213,9 @@ try {
     const metrics = await page.evaluate(() => Reflect.get(window, "__coldLoad").read());
     await writeFile(path.join(artifactDir, `run-${run + 1}.metrics.json`), JSON.stringify(metrics));
     const profile = await cdp.send("Profiler.stop");
-    const complete = new Promise<void>((resolve) =>
-      cdp.once("Tracing.tracingComplete", () => resolve()),
-    );
+    const complete = new Promise<void>((resolve) => {
+      cdp.once("Tracing.tracingComplete", () => resolve());
+    });
     await cdp.send("Tracing.end");
     await complete;
     await page.screenshot({ path: path.join(artifactDir, `run-${run + 1}.png`) });
@@ -241,10 +251,13 @@ try {
                   Math.abs(pixels[i + 1] - previous[i + 1]),
                   Math.abs(pixels[i + 2] - previous[i + 2]),
                 ) >= 32
-              )
+              ) {
                 changed++;
+              }
             }
-            if (changed / (344 * 236) >= 0.004) changes.push(frame.ts);
+            if (changed / (344 * 236) >= 0.004) {
+              changes.push(frame.ts);
+            }
           }
           previous = pixels;
         }
@@ -257,7 +270,7 @@ try {
         };
       },
       screenshots.map((event) => ({
-        ts: Number(event.ts),
+        ts: event.ts,
         data: event.args!.snapshot!,
       })),
     );
@@ -279,15 +292,17 @@ try {
     console.log(JSON.stringify(result));
     await cdp.detach();
   }
-  if (errors.length) throw new Error(`Browser errors: ${errors.join("\n")}`);
+  if (errors.length) {
+    throw new Error(`Browser errors: ${errors.join("\n")}`);
+  }
   await context.close();
 } finally {
   await browser?.close();
   await server.close();
   sandbox.closeAllConnections();
-  await new Promise<void>((resolve, reject) =>
-    sandbox.close((error) => (error ? reject(error) : resolve())),
-  );
+  await new Promise<void>((resolve, reject) => {
+    sandbox.close((error) => (error ? reject(error) : resolve()));
+  });
   await writeFile(
     path.join(artifactDir, "summary.json"),
     JSON.stringify(

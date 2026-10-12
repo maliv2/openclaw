@@ -30,7 +30,6 @@ export const TEAM_SCALE_COUNTS = {
   presenceEvents: 12,
 } as const;
 
-export const TEAM_SCALE_TIMESTAMP = 1_791_504_000_000;
 export const TEAM_SCALE_CATALOG_PROGRESS_ID = "team-scale-progress";
 export const TEAM_SCALE_SELF_INSTANCE_ID = "team-scale-self";
 
@@ -196,12 +195,12 @@ export function createControlUiTeamScaleFixture(options: FixtureOptions = {}) {
     id,
     label: id === "codex" ? "Codex" : "Claude Code",
     capabilities: { continueSession: true, archive: true },
-    hosts: Array.from({ length: 3 }, (_, hostIndex) => ({
+    hosts: Array.from({ length: 3 }, (_host, hostIndex) => ({
       hostId: `node:fixture-${catalogIndex * 3 + hostIndex + 1}`,
       label: `Fixture workstation ${catalogIndex * 3 + hostIndex + 1}`,
       kind: "node",
       connected: true,
-      sessions: Array.from({ length: counts.catalogSessionsPerHost }, (_, index) => ({
+      sessions: Array.from({ length: counts.catalogSessionsPerHost }, (_session, index) => ({
         threadId: `fixture-thread-${catalogIndex}-${hostIndex}-${index}`,
         name: `Synthetic code review ${hostIndex + 1}.${index + 1}`,
         cwd: `/workspace/project-${(index % 5) + 1}`,
@@ -238,15 +237,18 @@ export function createControlUiTeamScaleFixture(options: FixtureOptions = {}) {
   );
   const events: TeamScaleEvent[] = [];
   for (let index = 0; index < counts.presenceEvents; index++) {
-    if (catalogEvents[index]) events.push(catalogEvents[index]!);
+    if (catalogEvents[index]) {
+      events.push(catalogEvents[index]!);
+    }
     events.push({
       event: "presence",
       payload: {
-        presence: presenceEntries.map((entry, personIndex) => ({
-          ...entry,
-          ts: now + index + 1,
-          lastInputSeconds: personIndex === index + 1 ? 0 : entry.lastInputSeconds,
-        })),
+        presence: presenceEntries.map((entry, personIndex) =>
+          Object.assign({}, entry, {
+            ts: now + index + 1,
+            lastInputSeconds: personIndex === index + 1 ? 0 : entry.lastInputSeconds,
+          }),
+        ),
       },
     });
   }
@@ -362,10 +364,13 @@ export function createControlUiTeamScaleFixture(options: FixtureOptions = {}) {
         ],
       },
       "sessions.catalog.list": {
-        catalogs: catalogs.map((catalog) => ({
-          ...catalog,
-          hosts: catalog.hosts.map((host) => ({ ...host, sessions: [], pending: true })),
-        })),
+        catalogs: catalogs.map((catalog) =>
+          Object.assign({}, catalog, {
+            hosts: catalog.hosts.map((host) =>
+              Object.assign({}, host, { sessions: [], pending: true }),
+            ),
+          }),
+        ),
       },
       "plugins.controlUi.list": { revision: "team-scale-v1", diagnostics: [], plugins },
       "plugins.controlUi.report": { ok: true },

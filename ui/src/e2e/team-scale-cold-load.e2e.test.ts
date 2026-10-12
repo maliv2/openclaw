@@ -41,7 +41,9 @@ suite.define(() => {
         });
         await page.addInitScript(
           ({ key, entries }) => {
-            if (window !== window.top) return;
+            if (window !== window.top) {
+              return;
+            }
             localStorage.setItem(
               key,
               JSON.stringify({
@@ -77,13 +79,14 @@ suite.define(() => {
             frame.event === "sessions.catalog.host"
               ? { ...frame.payload, progressId }
               : {
-                  presence: frame.payload.presence.map((entry) => ({
-                    ...entry,
-                    instanceId:
-                      entry.instanceId === TEAM_SCALE_SELF_INSTANCE_ID
-                        ? instanceId
-                        : entry.instanceId,
-                  })),
+                  presence: frame.payload.presence.map((entry) =>
+                    Object.assign({}, entry, {
+                      instanceId:
+                        entry.instanceId === TEAM_SCALE_SELF_INSTANCE_ID
+                          ? instanceId
+                          : entry.instanceId,
+                    }),
+                  ),
                 },
           );
         }

@@ -11,7 +11,6 @@ import {
 import { resolvePersistedSessionStoreOwner } from "../../config/sessions/session-store-owner.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { formatErrorMessage } from "../../infra/errors.js";
-import { executeSqliteQuerySync } from "../../infra/kysely-sync.js";
 import {
   listExistingAgentDatabaseTargets,
   type ExistingAgentDatabaseTarget,
@@ -39,7 +38,7 @@ import { captureAcpSessionEntryBinding } from "./session-meta-entry.kernel.js";
 import {
   acpSessionRowMatchesEntry,
   buildAcpDatabaseSessionKey,
-  getAcpSessionKysely,
+  deleteAcpSessionMetaRows,
   parseAcpDatabaseSessionKey,
   selectAcpSessionRow,
   selectAcpSessionRows,
@@ -276,15 +275,9 @@ export async function repairAcpSessionMetaKeysForDoctor(params: {
               if (!destination) {
                 upsertAcpSessionMetaRow(shared.db, { ...source, session_key: destinationKey });
               }
-              executeSqliteQuerySync(
+              deleteAcpSessionMetaRows(
                 shared.db,
-                getAcpSessionKysely(shared.db)
-                  .deleteFrom("acp_sessions")
-                  .where(
-                    "session_key",
-                    "in",
-                    consumed.map((row) => row.session_key),
-                  ),
+                consumed.map((row) => row.session_key),
               );
               sessionChanges.emit(
                 { agentId: owner.agentId, sessionKey: owner.storeSessionKey },
@@ -439,19 +432,14 @@ export function updateAcpSessionIdentityForDoctor(
             "ACP ownership or metadata changed during Doctor repair; source retained",
           );
         }
-        executeSqliteQuerySync(
-          database.db,
-          getAcpSessionKysely(database.db)
-            .updateTable("acp_sessions")
-            .set({
-              runtime_session_name: input.runtimeSessionName,
-              identity_json: JSON.stringify({
-                ...claim.meta.identity,
-                acpxRecordId: input.acpxRecordId,
-              }),
-            })
-            .where("session_key", "=", key),
-        );
+        upsertAcpSessionMetaRow(database.db, {
+          ...row,
+          runtime_session_name: input.runtimeSessionName,
+          identity_json: JSON.stringify({
+            ...claim.meta.identity,
+            acpxRecordId: input.acpxRecordId,
+          }),
+        });
         sessionChanges.emit({ agentId: claim.agentId, sessionKey: claim.sessionKey }, database.db);
       },
       { env: scope.env },

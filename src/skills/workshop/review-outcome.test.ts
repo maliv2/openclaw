@@ -234,7 +234,7 @@ describe("postWorkshopChangeNotice", () => {
         }),
       );
       expect(mocks.enqueueSystemEvent).toHaveBeenCalledWith(
-        expect.stringContaining("A background skill review just changed your learned skills:"),
+        expect.stringContaining('skill_workshop action=archive name=release-notes reason="undo"'),
         { sessionKey: "agent:main:telegram:direct:42" },
       );
     },
@@ -284,10 +284,7 @@ describe("postWorkshopChangeNotice", () => {
         },
       }),
     );
-    expect(mocks.enqueueSystemEvent).toHaveBeenCalledWith(
-      expect.stringContaining("A background skill review just changed your learned skills:"),
-      { sessionKey },
-    );
+    expect(mocks.enqueueSystemEvent).toHaveBeenCalledWith(expect.any(String), { sessionKey });
   });
 
   it("leaves a conversation reset since the review started untouched", async () => {

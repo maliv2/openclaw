@@ -5580,10 +5580,11 @@ catalog; an absent catalog never triggers a native database fallback. Standalone
 async tool construction and personal bootstrap prepare it through the profile
 worker when needed. Personal-file disclosure still checks the current canonical
 identity after reading the file. Native participant recording uses resident aliases;
-participant and history workers use explicit native readers. The deprecated synchronous SDK catalog projectors
+participant and history workers use explicit native readers. The deprecated
+synchronous SDK catalog projectors
 (`createSessionCatalogSourceActorProjector` and `createSessionCatalogGitHubLinker`)
-and synchronous tool factories retain their native compatibility path until the
-next SDK major. The channel identity resolver retains native CLI/update
+and synchronous tool factories retain their native compatibility path for removal
+in a later release after stable deprecation. The channel identity resolver retains native CLI/update
 authorization reads, while profile schema admission and Doctor repairs keep their
 one-shot transactions. Schemas, stored bytes, and update behavior are unchanged.
 

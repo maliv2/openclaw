@@ -327,12 +327,6 @@ describe("gateway connection state", () => {
 
   it("advertises online people only through live operator connections", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
-      const state = createGatewayConnectionState({
-        scheduler: createTestGatewayScheduler(),
-        bootId: "online-recipients",
-        cfg: { agents: { entries: { main: {} } } },
-      });
-      onTestFinished(() => state.mentionInbox.dispose());
       const reads = { count: 0 };
       const requester = makeClient("requester", reads);
       const recipient = makeClient("recipient", reads);
@@ -353,11 +347,17 @@ describe("gateway connection state", () => {
           hasAvatar: false,
           updatedAt: 1,
         };
-        state.clients.add(peer.client);
       }
       using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      const state = createGatewayConnectionState({
+        scheduler: createTestGatewayScheduler(),
+        bootId: "online-recipients",
+        cfg: { agents: { entries: { main: {} } } },
+      });
+      onTestFinished(() => state.mentionInbox.dispose());
       for (const peer of [requester, recipient]) {
         prepareGatewayRecipientProfile(peer.client);
+        state.clients.add(peer.client);
       }
       const recipientOnline = async () => {
         let online: boolean | undefined;

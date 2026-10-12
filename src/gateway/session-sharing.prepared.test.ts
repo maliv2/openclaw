@@ -23,6 +23,7 @@ it("refreshes retained sharing facts on profile changes and clears them when ide
       profileId: source.id,
       aliases: new Set([source.id]),
       role: null,
+      githubLogin: null,
     });
     const stop = onUserProfilesChanged(() => prepareGatewayRecipientProfile(client));
     try {
@@ -34,6 +35,7 @@ it("refreshes retained sharing facts on profile changes and clears them when ide
         profileId: target.id,
         aliases: new Set([source.id, target.id]),
         role: "none",
+        githubLogin: null,
       });
       const prepare = vi.spyOn(DatabaseSync.prototype, "prepare");
       const sharing = prepareProjectedSessionSharing({

@@ -110,8 +110,9 @@ function formatWorkshopChangeNotice(
 }
 
 /**
- * Records a Control UI notice for every session. Opted-in, supported channels get a durable
- * send mirrored into the session transcript; all others get a transcript entry directly.
+ * Opted-in, supported channels get a durable send mirrored into the session transcript as
+ * plain text. All other sessions get a marked transcript entry the Control UI renders as the
+ * Learned row.
  * The next foreground turn also gets a system event naming the exact revert call,
  * because an assistant line the model did not write is weak evidence that "undo" means it.
  * A conversation reset or replaced since the review started gets none of it.

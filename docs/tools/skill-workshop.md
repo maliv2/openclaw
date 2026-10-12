@@ -52,11 +52,11 @@ it started with.
 
 ## Undo
 
-When a background run changes a skill, every session gets a compact **Learned**
-row in the Control UI chat; each skill name opens that skill in the Workshop.
-Channel messages are off by default. Set
-`skills.workshop.autonomous.channelNotices: true` to also post a notice to the
-conversation that triggered the review:
+When a background run changes a skill, the Control UI chat shows a compact
+**Learned** row; each skill name opens that skill in the Workshop. Channel
+messages are off by default. Set `skills.workshop.autonomous.channelNotices:
+true` to post the notice to the conversation that triggered the review
+instead; that session's Control UI chat then shows it as plain text:
 
 ```text
 💾 Learned: updated `deploy-staging` (tightened the rollback step). Say "undo" to revert this skill change.

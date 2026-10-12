@@ -92,13 +92,14 @@ commands, paths, or ids. When nothing durable was learned, it changes nothing.
 
 ## What you see
 
-When a review changes a skill, every session gets a **Learned** row in the
-Control UI chat: one chip per changed skill, each opening that skill in the
-Skill Workshop, and an **Undo** button. Nothing appears when nothing changed.
+When a review changes a skill, the Control UI chat shows a **Learned** row: one
+chip per changed skill, each opening that skill in the Skill Workshop, and an
+**Undo** button. Nothing appears when nothing changed.
 
 Channel messages are off by default. Set
-`skills.workshop.autonomous.channelNotices: true` to also post a notice to the
-conversation that triggered the review:
+`skills.workshop.autonomous.channelNotices: true` to post the notice to the
+conversation that triggered the review instead. That session's Control UI
+chat then shows the channel message as plain text, not the **Learned** row:
 
 ```text
 💾 Learned: updated `deploy-staging` (tightened the rollback step). Say "undo" to revert this skill change.

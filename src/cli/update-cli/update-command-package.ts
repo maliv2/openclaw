@@ -145,7 +145,10 @@ export async function runPackageUpdateDoctor(params: PackageDoctorOptions) {
       : undefined;
   } catch (error) {
     assertCurrent();
-    return await deferPackageStateVerification({ ...params, assertCurrent }, error);
+    return await deferPackageStateVerification(
+      { ...params, assertCurrent, migrationRecorded: Boolean(context?.databaseBackup?.migration) },
+      error,
+    );
   }
   await params.progress?.onStepStart?.(doctorProgressInfo);
   assertCurrent();

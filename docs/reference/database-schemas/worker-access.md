@@ -5274,8 +5274,15 @@ repeat ACP lookups or their schema admission checks. ACP publications invalidate
 the existing row revision, and entry lifecycle matching still rejects stale
 runtime metadata. Optional preview and terminal-message facts use the retained
 history worker, with foreground priority and row-generation checks before
-publication. The host evaluates fallback notices using its current runtime plugin
-aliases; configuration and model policy do not travel to the read worker.
+publication. Ordinary active-message appends also carry a bounded preview in the
+existing committed transcript receipt. Resident rows publish it immediately,
+without waiting for the background queue or rereading the transcript. A newer
+receipt supersedes an older pending preview read. The same 64 KiB message bound
+applies; an oversized newest message clears the preview. Cold rows, rewrites,
+non-display messages, and fallback-model facts retain the bounded worker reader.
+The host evaluates fallback notices using its current runtime plugin aliases;
+configuration and model policy do not travel to the read worker. This changes no
+stored bytes, schema, durability, retention, or update behavior.
 
 Targeted Memory transcript notifications queue session identities directly. The
 indexing owner resolves their corpus and forgetting tombstones once when the

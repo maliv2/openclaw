@@ -36,6 +36,8 @@ export type SessionTranscriptAuthority = SessionTranscriptContextVersion & {
   indexedSeq: number | null;
   activeMessageCount: number | null;
   needsRebuild: number | null;
+  /** Absent needs a tail lookup; null is a known empty bounded preview. */
+  lastMessagePreview?: string | null;
 };
 export type SessionTranscriptAuthorityReceipt = SqliteCommitReceipt<
   SessionTranscriptAuthority,
@@ -245,7 +247,10 @@ function isTranscriptReceipt(value: unknown): value is SessionTranscriptAuthorit
       (row.generation !== null && typeof row.generation !== "string") ||
       (row.leafEventId !== null && typeof row.leafEventId !== "string") ||
       ![row.rawSeq, row.updatedAt, row.indexedSeq, row.activeMessageCount].every(nullableNumber) ||
-      (row.needsRebuild !== null && row.needsRebuild !== 0 && row.needsRebuild !== 1)
+      (row.needsRebuild !== null && row.needsRebuild !== 0 && row.needsRebuild !== 1) ||
+      (row.lastMessagePreview !== undefined &&
+        row.lastMessagePreview !== null &&
+        typeof row.lastMessagePreview !== "string")
     ) {
       return false;
     }

@@ -199,7 +199,7 @@ it("publishes read-only transcript previews without acquiring stored row facts a
   });
 });
 
-it("retains transcript previews across metadata edits and refreshes them after a transcript append", async () => {
+it("retains transcript previews across metadata edits and consumes committed appends without reads", async () => {
   await withOpenClawTestState({ scenario: "minimal" }, async () => {
     const cfg = { agents: { entries: { main: {} } } };
     const scope = {
@@ -246,9 +246,54 @@ it("retains transcript previews across metadata edits and refreshes them after a
       expect(projection.snapshot(query, { includeLastMessage: true }).row?.lastMessagePreview).toBe(
         "Appended preview",
       );
-      expect(backfill).toHaveBeenCalledTimes(1);
+      await sessions.patchSessionEntryCore(scope, () => ({ displayName: "After append" }));
+      await projection.ensureMaterialized();
+      await nextTurn();
+      expect(projection.snapshot(query, { includeLastMessage: true }).row).toMatchObject({
+        displayName: "After append",
+        lastMessagePreview: "Appended preview",
+      });
+      expect(backfill).not.toHaveBeenCalled();
     } finally {
       projection.dispose();
+    }
+  });
+});
+
+it("keeps a committed append preview when an older background read finishes", async () => {
+  await withOpenClawTestState({ scenario: "minimal" }, async () => {
+    const cfg = { agents: { entries: { main: {} } } };
+    const scope = {
+      agentId: "main",
+      sessionKey: "agent:main:preview-receipt",
+      sessionId: "preview-receipt",
+    };
+    const query = { agentId: scope.agentId, key: scope.sessionKey };
+    sessions.replaceSessionEntrySync(scope, { sessionId: scope.sessionId, updatedAt: 1 });
+    await sessions.persistSessionTranscriptTurn(scope, {
+      messages: [{ message: { role: "user", content: "Older preview" } }],
+      touchSessionEntry: false,
+      updateMode: "none",
+    });
+    const backfill = holdBackfillPublication();
+    const projection = await createSessionRowProjection({ cfg, modelCatalog: [] });
+    try {
+      expect((await backfill.prepared).lastMessagePreview).toBe("Older preview");
+      await sessions.persistSessionTranscriptTurn(scope, {
+        messages: [{ message: { role: "assistant", content: "Committed preview" } }],
+        touchSessionEntry: false,
+      });
+      await projection.ensureMaterialized();
+      expect(projection.snapshot(query, { includeLastMessage: true }).row?.lastMessagePreview).toBe(
+        "Committed preview",
+      );
+      await backfill.publish();
+      expect(projection.snapshot(query, { includeLastMessage: true }).row?.lastMessagePreview).toBe(
+        "Committed preview",
+      );
+    } finally {
+      projection.dispose();
+      await backfill.close();
     }
   });
 });

@@ -37,7 +37,9 @@ describe("HTTP upload deadlines", () => {
       const [client, socket] = duplexPair();
       const chunks: Buffer[] = [];
       client.on("data", (chunk: Buffer) => chunks.push(chunk));
-      const response = new Promise<void>((resolve) => client.once("end", resolve));
+      const response = new Promise<void>((resolve) => {
+        client.once("end", resolve);
+      });
       let task: Promise<void> | undefined;
       const server = createServer((req, res) => {
         task = (async () => {

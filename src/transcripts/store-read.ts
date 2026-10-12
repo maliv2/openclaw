@@ -18,10 +18,10 @@ import {
   type TranscriptsGetParams,
 } from "../../packages/gateway-protocol/src/schema/transcripts.js";
 import {
-  transcriptJsonNotes,
-  transcriptJsonParticipants,
-  transcriptJsonSource,
-} from "../infra/database-engine/transcript-json.js";
+  jsonExtractText,
+  jsonOrderedTextArray,
+  jsonRemoveKey,
+} from "../infra/database-engine/json-values.js";
 import { executeSqliteQueryTakeFirstSync, iterateSqliteQuerySync } from "../infra/kysely-sync.js";
 import type { TranscriptSessionDescriptor } from "./provider-types.js";
 import { projectTranscriptSession } from "./read.js";
@@ -165,7 +165,7 @@ function readQuery(
     .whereRef("notes.session_started_at", "=", "meeting_transcript_sessions.started_at");
   const overview = notes.select("notes.overview").$asScalar();
   const summarySource = notes
-    .select((n) => transcriptJsonSource(database, n.ref("notes.summary_json")).as("source"))
+    .select((n) => jsonExtractText(database, n.ref("notes.summary_json"), "source").as("source"))
     .$asScalar();
   const utterances = eb
     .selectFrom("meeting_transcript_utterances as u")
@@ -183,7 +183,7 @@ function readQuery(
   const participants = eb
     .selectFrom(speakers.as("speakers"))
     .select((s) =>
-      transcriptJsonParticipants(
+      jsonOrderedTextArray(
         database,
         s.ref("speakers.speaker_label"),
         s.ref("speakers.first_sequence"),
@@ -619,7 +619,7 @@ export function readStoredTranscriptNotes(
     meetingTranscriptDb(database)
       .selectFrom("meeting_transcript_summaries")
       .select((eb) => {
-        const summary = transcriptJsonNotes(database, eb.ref("summary_json"));
+        const summary = jsonRemoveKey(database, eb.ref("summary_json"), "transcript");
         const bytes = textBytes(summary, eb.ref("markdown"));
         return [
           boundedText(summary, bytes, byteLimit(purpose)).as("summary"),

@@ -118,6 +118,32 @@ it("requires the reviewed declaration's deprecation marker", () => {
   ]);
 });
 
+it("permits a deprecated API only from an exact reviewed one-shot entry", () => {
+  const doctorFile = "src/flows/doctor-tool-schema-projection.ts";
+  const doctor = `import { ${first} } from '../plugin-sdk/sqlite-runtime-legacy.js';
+    export function collectAgentRuntimeToolSchemaFindings() { return ${first}(); }`;
+  const inspectDoctor = (file: string, source: string) =>
+    inspectDatabaseWorkerBoundaries(
+      process.cwd(),
+      new Map(Object.entries({ [legacyFile]: legacy, [file]: source })),
+      (candidate) => candidate === doctorFile,
+      (candidate, operation) =>
+        candidate === doctorFile && operation === "collectAgentRuntimeToolSchemaFindings"
+          ? "T3"
+          : undefined,
+    );
+  expect(inspectDoctor(doctorFile, doctor).violations).toEqual([]);
+  for (const [file, source] of [
+    [doctorFile, doctor.replace("collectAgentRuntimeToolSchemaFindings", "unreviewed")],
+    ["src/flows/unreviewed.ts", doctor],
+    [doctorFile, doctor.replace(`return ${first}()`, `return () => ${first}()`)],
+  ]) {
+    expect(inspectDoctor(file, source).violations).toEqual([
+      expect.stringContaining("bundled runtime reference"),
+    ]);
+  }
+});
+
 it("does not classify deprecated methods or their unverified factory objects", () => {
   const result = inspect({
     "src/gateway/github-publication-coordinator-methods.ts": `
@@ -138,6 +164,92 @@ it("does not classify deprecated methods or their unverified factory objects", (
   expect(result.violations).toEqual([
     expect.stringContaining("src/gateway/github-publication-coordinator-methods.ts:"),
   ]);
+});
+
+const mixedReceiverFile = "src/gateway/model-account-connect.ts";
+const mixedReceiver = `
+  import { readKernel } from '../session-kernel.js';
+  export function createModelAccountConnectService() {
+    const readLegacy = () => readKernel();
+    return {
+      /** @deprecated Await listLinksAsync. */
+      listLinks() { return readLegacy(); },
+      async listLinksAsync() { return executeSqliteQuerySync(query); },
+    };
+  }
+`;
+
+it("isolates reviewed deprecated members from their live factory and async siblings", () => {
+  const result = inspect({
+    [kernelFile]: kernel,
+    [mixedReceiverFile]: mixedReceiver,
+    "src/consumer.ts": `import { createModelAccountConnectService } from './gateway/model-account-connect.js';
+      const service = createModelAccountConnectService();
+      service.listLinksAsync();`,
+  });
+  expect(result.violations).toEqual([]);
+  expect(result.operations.get(mixedReceiverFile)).toEqual(
+    new Set([
+      "createModelAccountConnectService.listLinks",
+      "createModelAccountConnectService.readLegacy",
+    ]),
+  );
+  expect(result.operations.get(kernelFile)).toEqual(new Set(["readKernel"]));
+});
+
+it.each([
+  ["direct call", "service.listLinks();"],
+  ["escaped member", "register(service.listLinks);"],
+])("rejects a bundled %s to a reviewed deprecated member", (_label, use) => {
+  const result = inspect({
+    [kernelFile]: kernel,
+    [mixedReceiverFile]: mixedReceiver,
+    "src/consumer.ts": `import { createModelAccountConnectService } from './gateway/model-account-connect.js';
+      const service = createModelAccountConnectService(); ${use}`,
+  });
+  expect(result.operations.has(kernelFile)).toBe(false);
+  expect(result.operations.has(mixedReceiverFile)).toBe(false);
+  expect(result.violations).toEqual([expect.stringContaining("src/consumer.ts:")]);
+});
+
+it("requires the reviewed member itself to remain deprecated", () => {
+  const result = inspect({
+    [kernelFile]: kernel,
+    [mixedReceiverFile]: mixedReceiver.replace("@deprecated", "Legacy:"),
+  });
+  expect(result.operations.has(kernelFile)).toBe(false);
+  expect(result.violations).toEqual([
+    `${mixedReceiverFile}:createModelAccountConnectService.listLinks: reviewed compatibility operation must be @deprecated`,
+  ]);
+});
+
+it("keeps a local legacy helper live when an async sibling calls it", () => {
+  const result = inspect({
+    [kernelFile]: kernel,
+    [mixedReceiverFile]: mixedReceiver.replace(
+      "async listLinksAsync() { return executeSqliteQuerySync(query); }",
+      "async listLinksAsync() { return readLegacy(); }",
+    ),
+  });
+  expect(result.operations.has(kernelFile)).toBe(false);
+  expect(result.operations.get(mixedReceiverFile)?.has("createModelAccountConnectService")).toBe(
+    false,
+  );
+});
+
+it("does not trust a same-named deprecated member on another factory", () => {
+  const result = inspect({
+    [kernelFile]: kernel,
+    [mixedReceiverFile]: `${mixedReceiver}
+      export function createOtherService() {
+        return {
+          /** @deprecated Await listLinksAsync. */
+          listLinks() { return readKernel(); },
+        };
+      }`,
+  });
+  expect(result.operations.has(kernelFile)).toBe(false);
+  expect(result.operations.get(mixedReceiverFile)?.has("createOtherService.listLinks")).toBe(false);
 });
 
 it("allows async-only members selected from a dynamic namespace import", () => {

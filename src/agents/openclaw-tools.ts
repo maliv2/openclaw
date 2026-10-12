@@ -8,6 +8,7 @@ import { getActiveSecretsRuntimeConfigSnapshot } from "../secrets/runtime-state.
 import { getActiveRuntimeWebToolsMetadataFromState } from "../secrets/runtime-web-tools-state.js";
 import { isCronRunSessionKey } from "../sessions/session-key-utils.js";
 import { resolveSkillWorkshopToolConstructionBlock } from "../skills/workshop/tool-availability.js";
+import { hasMultipleSessionSharingIdentitiesNative } from "../state/user-profile-list.native.js";
 import { hasConfiguredWebSearchProvider } from "../web-search/runtime.js";
 import {
   resolveAgentDir,
@@ -127,13 +128,17 @@ export async function createOpenClawToolsWithPreparation(
   options: OpenClawToolsOptions | undefined,
   shared: PreparedToolConstruction,
 ): Promise<AnyAgentTool[]> {
-  const { captured, delegated, webSearchConfigured, mediaTools } = await prepareOpenClawTools(
-    options,
-    shared,
-  );
+  const { captured, delegated, webSearchConfigured, mediaTools, personalInstructionsEnabled } =
+    await prepareOpenClawTools(options, shared);
   shared.assertCurrent();
   captured.assertInvocationCurrent?.();
-  const steps = createOpenClawToolsSteps(captured, delegated, webSearchConfigured, mediaTools);
+  const steps = createOpenClawToolsSteps(
+    captured,
+    delegated,
+    webSearchConfigured,
+    mediaTools,
+    personalInstructionsEnabled,
+  );
   let next = steps.next();
   while (!next.done) {
     const tools =
@@ -167,6 +172,8 @@ export function createOpenClawTools(
     captured,
     preparedDelegateTools,
     preparedWebSearchConfigured,
+    undefined,
+    !isEmbeddedMode() && hasMultipleSessionSharingIdentitiesNative(),
   );
   let next = steps.next();
   while (!next.done) {
@@ -184,6 +191,7 @@ function* createOpenClawToolsSteps(
   preparedDelegateTools?: AnyAgentTool[],
   preparedWebSearchConfigured?: boolean,
   preparedMediaTools?: Readonly<ReturnType<typeof resolveOptionalMediaToolFactoryPlan>>,
+  personalInstructionsEnabled = false,
 ): Generator<
   | { message: Parameters<typeof createMessageTool>[0] }
   | { plugins: Parameters<typeof resolveOpenClawPluginToolsForOptions>[0] },
@@ -517,7 +525,13 @@ function* createOpenClawToolsSteps(
     imageGenerateTool,
     musicGenerateTool,
     videoGenerateTool,
-    ...createHostedGatewayTools(embedded, sessionAgentId, options, preparedDelegateTools),
+    ...createHostedGatewayTools(
+      embedded,
+      sessionAgentId,
+      options,
+      preparedDelegateTools,
+      personalInstructionsEnabled,
+    ),
     createAgentsListTool({
       agentSessionKey: options?.agentSessionKey,
       requesterAgentIdOverride: sessionAgentId,

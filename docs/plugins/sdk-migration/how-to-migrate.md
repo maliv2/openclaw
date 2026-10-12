@@ -614,7 +614,7 @@ invoke the supplied assertion after preparation and before the final sharing rea
 replacement at the same path, even when session IDs were reused.
 
 The released synchronous `createSessionCatalogSourceActorProjector` and
-`createSessionCatalogGitHubLinker` signatures remain available for existing plugins;
+`createSessionCatalogGitHubLinker` signatures are deprecated and remain available for existing plugins;
 bundled Session Share uses the awaited helpers. Schemas, stored data, retention,
 permissions, and update behavior are unchanged.
 

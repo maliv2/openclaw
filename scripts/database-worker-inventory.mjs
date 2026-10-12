@@ -269,6 +269,75 @@ const reviewed = new Map([
 // Match lexical operation paths, not moving line numbers or whole mixed modules.
 const reviewedOperations = new Map([
   [
+    "src/flows/doctor-tool-schema-projection.ts",
+    [
+      {
+        tier: "T3",
+        operations: ["collectAgentRuntimeToolSchemaFindings"],
+        evidence:
+          "Only doctor-tool-schema-runtime.ts invokes this projection through collectRuntimeToolSchemaFindings, wired exclusively into doctor-core-checks.ts by doctor-tool-schema-check.ts. Its synchronous tool construction runs under withPluginRuntimeGenerationRegistryScope during the Doctor one-shot.",
+      },
+    ],
+  ],
+  [
+    "src/config/sessions/session-accessor.sqlite-participants.native.ts",
+    [
+      {
+        tier: "W",
+        operations: ["recordSessionParticipantFromWorker"],
+        evidence:
+          "Only session-sharing-store.worker.ts invokes this worker entry. The separate native participant entry resolves aliases from the resident Gateway catalog.",
+      },
+    ],
+  ],
+  [
+    "src/gateway/channel-operator-authority.ts",
+    [
+      {
+        tier: "T3",
+        operations: [
+          "resolveChannelOperatorAdminAuthority",
+          "resolveUpdateChannelOperatorAdminIdentityAuthority",
+        ],
+        evidence:
+          "Native identity capture is private to resolveChannelOperatorAdminAuthority and resolveUpdateChannelOperatorAdminIdentityAuthority; command-auth.ts passes those only to the CLI/updater captureCommandOwnerIdentity path used by update-requester-authority.ts. Gateway ingress awaits prepareChannelOperatorAdmin instead. Returned currency checks preserve update execution authority.",
+      },
+    ],
+  ],
+  [
+    "src/state/user-profiles-owner-migration.ts",
+    [
+      {
+        tier: "T3",
+        operations: ["repairMergedGatewayOwnerProfile"],
+        evidence:
+          "Doctor repair-sequencing.ts invokes merged-owner repair; preview-warnings.ts invokes the same entry with shouldRepair false. No Gateway caller.",
+      },
+    ],
+  ],
+  [
+    "src/state/user-channel-identities.ts",
+    [
+      {
+        tier: "W",
+        operations: ["linkUserChannelIdentity", "unlinkUserChannelIdentity"],
+        evidence:
+          "Only user-channel-identities.worker.ts executes channel link/unlink mutations; Gateway callers await the registered worker operations.",
+      },
+    ],
+  ],
+  [
+    "src/state/user-profiles-tailscale-migration.ts",
+    [
+      {
+        tier: "T3",
+        operations: ["migrateLegacyTailscaleProfileIdentities"],
+        evidence:
+          "Only commands/doctor/repair-sequencing.ts invokes the legacy Tailscale identity repair.",
+      },
+    ],
+  ],
+  [
     "src/state/openclaw-quarantine-store.ts",
     [
       {
@@ -2321,6 +2390,10 @@ const reviewedOperations = new Map([
   ],
 ]);
 const workerModules = new Set([
+  "src/state/user-profiles.worker.ts", // Registered profile operations; Gateway submits commands through user-profile-operations.ts.
+  "src/state/user-profile-writes.worker.ts", // Shared-state profile mutation implementation; loaded by the profile worker only.
+  "src/state/user-profile-read.worker.ts", // Shared-state read registry owns catalog identity and channel identity reads.
+  "src/state/user-profile-catalog-identity.read.ts", // Only readUserProfileReadCommand in user-profile-read.worker.ts executes this reader.
   "src/gateway/github-personal-publication-store.worker.ts", // Shared-state publication request, mutation, and read workers only.
   "src/gateway/github-publication-store.worker.ts", // Shared-state publication request, mutation, and read workers only.
   "src/state/user-github-connections.worker.ts", // openclaw-state-worker-registry installs its operation table; host imports are type-only.

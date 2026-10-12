@@ -17,6 +17,7 @@ import { fenceUserProfileMutationAuthority, onUserProfilesChanged } from "./user
 import {
   getUserProfileDisplay,
   getUserProfileDisplays,
+  hasMultipleSessionSharingIdentities,
   prepareUserProfileCatalog,
   prepareUserProfileIdentity,
   readUserProfileAliases,
@@ -57,6 +58,32 @@ function fixture() {
 }
 
 describe("resident profile display and reference catalog", () => {
+  it("never opens native storage from an unprepared runtime read", async () => {
+    const options = fixture();
+    const profile = ensureProfileForEmail("cold@example.test", options);
+    const native = vi.spyOn(stateReads, "withExistingOpenClawStateDatabaseReadOnly");
+    const queries = vi.spyOn(openOpenClawStateDatabase(options).db, "prepare");
+    expect(readUserProfileIdentity(profile.id, options)).toBeUndefined();
+    expect(readUserProfileAliases(profile.id, options)).toEqual(new Set([profile.id]));
+    expect(hasMultipleSessionSharingIdentities(options)).toBe(false);
+    expect(getUserProfileDisplays([profile.id], options)).toEqual(new Map());
+    expect(() => getUserProfileDisplay(profile.id, options)).toThrow("user profile not found");
+    expect(native).not.toHaveBeenCalled();
+    expect(queries).not.toHaveBeenCalled();
+
+    const catalog = await prepareUserProfileCatalog(options);
+    releases.push(catalog.release);
+    expect(getUserProfileDisplay(profile.id, options).displayName).toBe("cold");
+    queries.mockClear();
+    setDisplayName(profile.id, "Current", options);
+    queries.mockClear();
+    expect(getUserProfileDisplays([profile.id], options).get(profile.id)?.displayName).toBe(
+      "Current",
+    );
+    expect(queries).not.toHaveBeenCalled();
+    expect(native).not.toHaveBeenCalled();
+  });
+
   it("prepares first physical admission after a retained absent catalog without native hydration", async () => {
     const options = fixture();
     const absent = await prepareUserProfileCatalog(options);

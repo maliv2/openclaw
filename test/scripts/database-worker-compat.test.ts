@@ -846,3 +846,87 @@ it("uses reviewed worker ownership for its complete handler table", () => {
     expect(escaped.nonRuntimeOperations.has(maintenanceFile)).toBe(caller === file);
   }
 });
+
+const channelAuthorityFile = "src/gateway/channel-operator-authority.ts";
+const profileEmailsFile = "src/state/user-profiles-internal.ts";
+
+function inspectChannelAuthority(source: string, extra: Record<string, string> = {}) {
+  return inspectDatabaseWorkerBoundaries(
+    process.cwd(),
+    new Map(
+      Object.entries({
+        [profileEmailsFile]: `export function selectUserProfileEmails() { return executeSqliteQuerySync(query); }`,
+        [channelAuthorityFile]: `import { selectUserProfileEmails } from '../state/user-profiles-internal.js';
+          function resolveChannelOperatorIdentityFacts() {
+            return { isCurrent: () => selectUserProfileEmails() };
+          }
+          ${source}`,
+        ...extra,
+      }),
+    ),
+    () => false,
+    (file, operation) =>
+      file === channelAuthorityFile &&
+      [
+        "resolveChannelOperatorAdminAuthority",
+        "resolveUpdateChannelOperatorAdminIdentityAuthority",
+      ].includes(operation)
+        ? "T3"
+        : undefined,
+  );
+}
+
+it.each([
+  ["resolveChannelOperatorAdminAuthority", "captureLinkedOperatorAdmin"],
+  ["resolveUpdateChannelOperatorAdminIdentityAuthority", "captureLinkedOperatorAdminIdentity"],
+])("proves the retained identity callback at %s", (caller, receiver) => {
+  const source = `
+    function ${receiver}(cfg, linked, isCurrent) { return { isCurrent }; }
+    export function ${caller}() {
+      const prepared = resolveChannelOperatorIdentityFacts();
+      return ${receiver}(null, null, prepared.isCurrent);
+    }
+  `;
+  const result = inspectChannelAuthority(source);
+  expect(result.nonRuntimeOperations.get(profileEmailsFile)?.get("selectUserProfileEmails")).toBe(
+    "T3",
+  );
+  const liveSibling = inspectChannelAuthority(`${source}
+    export function handle() { return resolveChannelOperatorIdentityFacts().isCurrent; }
+  `);
+  expect(liveSibling.nonRuntimeOperations.has(profileEmailsFile)).toBe(false);
+});
+
+it.each([
+  ["runtime caller", "handle", "captureLinkedOperatorAdmin(null, null, prepared.isCurrent)"],
+  [
+    "wrong argument",
+    "resolveChannelOperatorAdminAuthority",
+    "captureLinkedOperatorAdmin(null, prepared.isCurrent, null)",
+  ],
+  ["unknown consumer", "resolveChannelOperatorAdminAuthority", "save(prepared.isCurrent)"],
+])("keeps an identity callback live after a %s", (_label, caller, call) => {
+  const result = inspectChannelAuthority(`
+    function captureLinkedOperatorAdmin(cfg, linked, isCurrent) { return { isCurrent }; }
+    function save(value) { return value; }
+    export function ${caller}() {
+      const prepared = resolveChannelOperatorIdentityFacts();
+      return ${call};
+    }
+  `);
+  expect(result.nonRuntimeOperations.has(profileEmailsFile)).toBe(false);
+});
+
+it("rejects a same-named identity consumer from another module", () => {
+  const result = inspectChannelAuthority(
+    `import { captureLinkedOperatorAdmin } from './unreviewed.js';
+    export function resolveChannelOperatorAdminAuthority() {
+      const prepared = resolveChannelOperatorIdentityFacts();
+      return captureLinkedOperatorAdmin(null, null, prepared.isCurrent);
+    }`,
+    {
+      "src/gateway/unreviewed.ts": `export function captureLinkedOperatorAdmin(cfg, linked, isCurrent) { return isCurrent; }`,
+    },
+  );
+  expect(result.nonRuntimeOperations.has(profileEmailsFile)).toBe(false);
+});

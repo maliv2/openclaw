@@ -182,6 +182,27 @@ const nonRuntimeCandidates = new Map<string, readonly string[]>([
   ],
 ]);
 
+// These one-shot owners retain the identity callback only in their returned CLI authority.
+const nonRuntimeMemberForwards = new Map([
+  [
+    "src/gateway/channel-operator-authority.ts",
+    [
+      {
+        caller: "resolveChannelOperatorAdminAuthority",
+        member: "resolveChannelOperatorIdentityFacts.isCurrent",
+        receiver: "captureLinkedOperatorAdmin",
+        argument: 2,
+      },
+      {
+        caller: "resolveUpdateChannelOperatorAdminIdentityAuthority",
+        member: "resolveChannelOperatorIdentityFacts.isCurrent",
+        receiver: "captureLinkedOperatorAdminIdentity",
+        argument: 2,
+      },
+    ],
+  ],
+]);
+
 // These exact declarations consume their inline callbacks synchronously.
 const synchronousScopes = new Map<string, ReadonlyMap<string, number>>([
   [
@@ -901,7 +922,7 @@ export function inspectDatabaseWorkerBoundaries(
           callerEdges.set(owner, calls);
         } else {
           let nonRuntime = false;
-          if (directCall && !unprovenCallback) {
+          if (!unprovenCallback) {
             const enclosingNames: string[] = [];
             for (let parent: ts.Node | undefined = node.parent; parent; parent = parent.parent) {
               if (
@@ -914,10 +935,35 @@ export function inspectDatabaseWorkerBoundaries(
             }
             const name = enclosingNames.join(".");
             const tier = classifyEntry(file, name);
-            nonRuntime =
-              tier !== undefined ||
-              ((!callee.reviewed || callee.candidate) && isNonRuntime(file, name));
-            if (tier) {
+            const consumer = expression.parent;
+            const receiver =
+              ts.isCallExpression(consumer) &&
+              resolveSymbol(
+                checker.getSymbolAtLocation(consumer.expression),
+              )?.valueDeclaration?.resolve();
+            const reviewedForward =
+              tier === "T3" &&
+              ts.isCallExpression(consumer) &&
+              receiver &&
+              ts.isFunctionDeclaration(receiver) &&
+              path.relative(root, receiver.getSourceFile().fileName).split(path.sep).join("/") ===
+                file &&
+              nonRuntimeMemberForwards
+                .get(file)
+                ?.some(
+                  (forward) =>
+                    forward.caller === name &&
+                    callee.file === file &&
+                    forward.member === callee.name &&
+                    forward.receiver === operationName(receiver) &&
+                    consumer.arguments[forward.argument] === expression,
+                );
+            nonRuntime = Boolean(
+              (directCall || reviewedForward) &&
+              (tier !== undefined ||
+                ((!callee.reviewed || callee.candidate) && isNonRuntime(file, name))),
+            );
+            if (nonRuntime && tier) {
               callee.entries.add(tier);
             } else {
               callee.nonRuntimeValid = false;

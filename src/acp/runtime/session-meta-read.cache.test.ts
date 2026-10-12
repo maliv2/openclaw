@@ -96,7 +96,7 @@ it("reuses admitted ACP rows until an ACP write without freshness probes", () =>
   expect(read().rows).toEqual([null]);
   const observation = observeSqliteReadSql(StatementSync.prototype);
   const metadataReads = () =>
-    observation.queries.filter((sql) => /(?:from|join) "acp_sessions"/iu.test(sql));
+    observation.queries.filter((sql) => /^select\b.*(?:from|join) "acp_sessions"/isu.test(sql));
   try {
     expect(read().rows).toEqual([null]);
     expect(read().rows).toEqual([null]);

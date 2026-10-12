@@ -272,7 +272,7 @@ it("refreshes ACP rows while retaining the admitted same-file format", async () 
     peer
       .prepare("INSERT INTO config_machine_state VALUES (?, ?, 1)")
       .run(CONTENT_VERSION_KEY, String(OPENCLAW_STATE_SCHEMA_VERSION + 1));
-    peer.exec("UPDATE acp_sessions SET runtime_session_name = 'after'");
+    insert(key, "after");
     const observation = observeSqliteReadSql(sqlite.requireNodeSqlite().StatementSync.prototype);
     try {
       expect(await workerRead(command)).toMatchObject({

@@ -11,6 +11,7 @@ import {
 import { resolvePersistedSessionStoreOwner } from "../../config/sessions/session-store-owner.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { formatErrorMessage } from "../../infra/errors.js";
+import { executeSqliteQuerySync } from "../../infra/kysely-sync.js";
 import {
   listExistingAgentDatabaseTargets,
   type ExistingAgentDatabaseTarget,
@@ -39,6 +40,7 @@ import {
   acpSessionRowMatchesEntry,
   buildAcpDatabaseSessionKey,
   deleteAcpSessionMetaRows,
+  getAcpSessionKysely,
   parseAcpDatabaseSessionKey,
   selectAcpSessionRow,
   selectAcpSessionRows,

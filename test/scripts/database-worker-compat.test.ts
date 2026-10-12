@@ -667,7 +667,7 @@ export function selectResolvedUserProfile() {
 export function ${first}() { return selectResolvedUserProfile(); }`,
   );
   expect(result.violations).toEqual([]);
-  expect(result.callLocations.get(profileFile)).toEqual(new Set(["3:10", "3:46"]));
+  expect(result.callLocations.get(profileFile)).toEqual(new Set(["1:53", "3:10", "3:48"]));
 });
 
 it("does not confuse a nested function path with a live top-level namesake", () => {

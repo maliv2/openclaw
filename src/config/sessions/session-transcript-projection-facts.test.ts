@@ -8,6 +8,7 @@ import {
 import { readOpenClawAgentDatabaseIdentity } from "../../state/openclaw-agent-db-identity.js";
 import { runOpenClawAgentWriteTransaction } from "../../state/openclaw-agent-db.js";
 import { withOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
+import { appendSqliteTrajectoryRuntimeEventsWithWriter } from "../../trajectory/runtime-store.sqlite.js";
 import type { TranscriptEvent } from "./session-accessor.sqlite-contract.js";
 import {
   readCurrentProjectionSnapshot,
@@ -165,6 +166,44 @@ it("carries a retained actor projection into the history reader and rejects it a
       }
     } finally {
       replica.close();
+    }
+  });
+});
+
+it("keeps transcript receipts through unrelated trajectory append and trim", async () => {
+  await withOpenClawTestState({ scenario: "minimal" }, async () => {
+    const f = fixture();
+    const receipt = f.receipt();
+    const observed = f.observe();
+    try {
+      for (const id of ["first", "replacement"]) {
+        appendSqliteTrajectoryRuntimeEventsWithWriter(
+          {
+            sessionId: f.scope.sessionId,
+            events: [{ runId: id, ts: "2026-10-12T00:00:00Z", line: JSON.stringify({ id }) }],
+            discardPrevious: true,
+          },
+          (_label, write) => f.write(() => write(f.database)),
+        );
+        expect(f.read(receipt)).toMatchObject({
+          kind: "value",
+          value: { version: { rawSeq: 1 }, state: { activeMessageCount: 2 } },
+        });
+      }
+      expect(observed.counts.snapshot).toBe(0);
+      expect(
+        f.database.db
+          .prepare("SELECT event_json FROM trajectory_runtime_events WHERE session_id = ?")
+          .all(f.scope.sessionId),
+      ).toEqual([{ event_json: JSON.stringify({ id: "replacement" }) }]);
+      f.write(() => f.append([{ ...user, id: "next", parentId: "assistant" }]));
+      expect(f.read(receipt)).toMatchObject({
+        kind: "value",
+        value: { version: { rawSeq: 2 }, state: { activeMessageCount: 3 } },
+      });
+      expect(observed.counts.snapshot).toBe(1);
+    } finally {
+      observed.restore();
     }
   });
 });

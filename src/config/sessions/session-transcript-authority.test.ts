@@ -182,7 +182,6 @@ it.each(["native", "worker"] as const)(
             content: "static",
             timestamp: 3,
           }),
-        "static",
       );
       const refreshed =
         realm === "native" ? SessionManager.open(scope) : await SessionManager.openAsync(scope);

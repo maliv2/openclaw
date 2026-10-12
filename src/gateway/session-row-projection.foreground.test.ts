@@ -210,6 +210,7 @@ it("retains transcript previews across metadata edits and consumes committed app
     const query = { agentId: scope.agentId, key: scope.sessionKey };
     sessions.replaceSessionEntrySync(scope, { sessionId: scope.sessionId, updatedAt: 1 });
     await sessions.persistSessionTranscriptTurn(scope, {
+      config: cfg,
       messages: [{ message: { role: "user", content: "Original preview" } }],
       touchSessionEntry: false,
       updateMode: "none",
@@ -239,6 +240,7 @@ it("retains transcript previews across metadata edits and consumes committed app
       expect(backfill.mock.calls.length).toBe(0);
       const appended = observeSessionRowBackfill([scope.sessionKey]);
       await sessions.persistSessionTranscriptTurn(scope, {
+        config: cfg,
         messages: [{ message: { role: "assistant", content: "Appended preview" } }],
         touchSessionEntry: false,
       });
@@ -271,6 +273,7 @@ it("keeps a committed append preview when an older background read finishes", as
     const query = { agentId: scope.agentId, key: scope.sessionKey };
     sessions.replaceSessionEntrySync(scope, { sessionId: scope.sessionId, updatedAt: 1 });
     await sessions.persistSessionTranscriptTurn(scope, {
+      config: cfg,
       messages: [{ message: { role: "user", content: "Older preview" } }],
       touchSessionEntry: false,
       updateMode: "none",
@@ -280,6 +283,7 @@ it("keeps a committed append preview when an older background read finishes", as
     try {
       expect((await backfill.prepared).lastMessagePreview).toBe("Older preview");
       await sessions.persistSessionTranscriptTurn(scope, {
+        config: cfg,
         messages: [{ message: { role: "assistant", content: "Committed preview" } }],
         touchSessionEntry: false,
       });

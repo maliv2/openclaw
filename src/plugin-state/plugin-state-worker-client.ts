@@ -175,9 +175,8 @@ async function execute<Key extends keyof PluginStateWorkerOperations>(
         readPluginStateObservationCache(identity, { ...typedCommand.input, key }),
       );
       if (
-        cachedEntries !== undefined ||
-        (typedCommand.type !== "pluginState.entries" &&
-          cached.every((entry) => entry !== undefined))
+        cached.every((entry) => entry !== undefined) &&
+        (typedCommand.type !== "pluginState.entries" || cachedEntries !== undefined)
       ) {
         const terminalFailure =
           openClawStateDatabaseCache.getOpenClawStateDatabaseRecordedFailure(databasePath);
@@ -269,8 +268,8 @@ async function execute<Key extends keyof PluginStateWorkerOperations>(
           result.value as PluginStateWorkerRequests["pluginState.observe"]["output"];
         installObservation?.(observation.row);
       } else if (command.type === "pluginState.entries") {
-        // SAFETY: The command discriminant fixes this worker result's entry list.
         installEntries?.(
+          // SAFETY: The command discriminant fixes this worker result's entry list.
           result.value as PluginStateWorkerRequests["pluginState.entries"]["output"],
         );
       }

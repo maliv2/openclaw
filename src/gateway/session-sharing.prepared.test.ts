@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it, vi } from "vitest";
 import { onUserProfilesChanged } from "../state/user-profile-events.js";
+import { prepareUserProfileCatalog } from "../state/user-profile-list.js";
 import { linkEmail, setUserProfileRole } from "../state/user-profile-writes.worker.js";
 import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
@@ -15,6 +16,7 @@ it("refreshes retained sharing facts on profile changes and clears them when ide
   await withOpenClawTestState({ scenario: "minimal" }, async () => {
     const source = ensureProfileForEmail("source@example.test");
     const target = ensureProfileForEmail("target@example.test");
+    using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
     const client = sharingPolicyClient({ user: source.id }) as GatewayWsClient;
     prepareGatewayRecipientProfile(client);
     expect(client.preparedSessionProfile).toEqual({

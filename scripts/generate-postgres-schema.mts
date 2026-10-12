@@ -10,6 +10,7 @@ import { parseArgs } from "node:util";
 import { WORKBOARD_SCHEMA_SQL } from "../extensions/workboard/src/workboard-schema.ts";
 import { listOpenClawStateFeatureSchemas } from "../src/state/openclaw-state-feature-schema.ts";
 import { isDirectRunUrl } from "./lib/direct-run.mjs";
+import { formatGeneratedModule } from "./lib/format-generated-module.mts";
 import {
   catalog,
   literal,
@@ -233,7 +234,11 @@ export async function generatePostgresSchemas(
       );
     }
   }
-  files["portability-report.md"] = `${markdown.join("\n")}\n`;
+  files["portability-report.md"] = formatGeneratedModule(`${markdown.join("\n")}\n`, {
+    repoRoot: ROOT,
+    outputPath: "portability-report.md",
+    errorLabel: "PostgreSQL portability report",
+  });
   return { files, report };
 }
 

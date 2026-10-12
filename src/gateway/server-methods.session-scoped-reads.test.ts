@@ -6,6 +6,7 @@ import * as sessions from "../config/sessions/session-accessor.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import { prepareUserProfileCatalog } from "../state/user-profile-list.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
+import { prepareGatewayRecipientProfile } from "./expected-profile.js";
 import { createSessionMessageSubscriberRegistry } from "./server-chat-state.js";
 import { createDirectChatContext } from "./server-chat.agent-events.test-helpers.js";
 import { handleGatewayRequest } from "./server-methods.js";
@@ -84,6 +85,7 @@ describe("narrow session read owners", () => {
         reader.connect.scopes = ["operator.sessions.read"];
         const owner = roleClient("view", "row-owner");
         using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+        prepareGatewayRecipientProfile(reader);
         const cfg = roles ? rolePolicyConfig() : {};
         await state.writeConfig(cfg);
         const subscribers = createSessionMessageSubscriberRegistry();
@@ -188,6 +190,7 @@ describe("narrow session read owners", () => {
           connId: "subscription-reader",
         };
         using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+        prepareGatewayRecipientProfile(client);
         client.connect.scopes = ["operator.sessions.read"];
         const cfg = rolePolicyConfig();
         const entry = {
@@ -277,6 +280,7 @@ describe("narrow session read owners", () => {
         const client = roleClient("view", "metadata-reader");
         const owner = roleClient("view", "metadata-owner");
         using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+        prepareGatewayRecipientProfile(client);
         const cfg = rolePolicyConfig();
         await state.writeConfig(cfg);
         const entry = {
@@ -431,6 +435,7 @@ describe("narrow session read owners", () => {
       reader.connect.scopes = ["operator.sessions.read"];
       const owner = roleClient("view", "scoped-owner");
       using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      prepareGatewayRecipientProfile(reader);
       const cfg = rolePolicyConfig();
       cfg.gateway!.roles!.definitions.view!.scopes.push("operator.admin");
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
@@ -491,6 +496,7 @@ describe("narrow session read owners", () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const reader = roleClient("view", "retained-reader");
       using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      prepareGatewayRecipientProfile(reader);
       reader.connect.scopes = ["operator.sessions.read"];
       const cfg = rolePolicyConfig();
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
@@ -576,6 +582,7 @@ describe("narrow session read owners", () => {
     await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
       const reader = roleClient("view", "remote-reader");
       using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      prepareGatewayRecipientProfile(reader);
       reader.connect.scopes = ["operator.sessions.read"];
       const cfg = rolePolicyConfig();
       const context = createDirectChatContext({ getRuntimeConfig: () => cfg });
@@ -663,6 +670,9 @@ describe("narrow session read owners", () => {
             ? sharingPolicyClient({ user: GATEWAY_OWNER_PROFILE_ID, scopes: ["operator.read"] })
             : roleClient("view", "missing-reader");
       using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+      if (client) {
+        prepareGatewayRecipientProfile(client);
+      }
       if (identity === "narrow" && client) {
         client.connect.scopes = ["operator.sessions.read"];
       }

@@ -5,6 +5,7 @@ import { closeOpenClawAgentDatabasesForTest } from "../state/openclaw-agent-db.j
 import { prepareUserProfileCatalog } from "../state/user-profile-list.js";
 import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
+import { prepareGatewayRecipientProfile } from "./expected-profile.js";
 import { authorizeOperatorScopesForMethod } from "./method-scopes.js";
 import { createDirectChatContext } from "./server-chat.agent-events.test-helpers.js";
 import type { GatewayClient, GatewayRequestContext } from "./server-methods/types.js";
@@ -654,7 +655,9 @@ describe("session sharing policy", () => {
     async (visibility) => {
       await withOpenClawTestState({ scenario: "minimal" }, async () => {
         const sessionKey = `agent:main:assignment-${visibility}`;
+        const cappedClient = roleClient("view", `assignment-${visibility}`);
         using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+        prepareGatewayRecipientProfile(cappedClient);
         await upsertSessionEntryCore(
           { agentId: "main", sessionKey },
           {
@@ -675,7 +678,7 @@ describe("session sharing policy", () => {
         expect(() => authorization.authorization?.assertCurrent()).not.toThrow();
 
         const capped = resolveSessionMutationAuthorization({
-          client: roleClient("view", `assignment-${visibility}`),
+          client: cappedClient,
           method: "sessions.assignOwner",
           requestParams: { key: sessionKey, owner: { type: "agent", id: "main" } },
           context: {

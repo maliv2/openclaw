@@ -36,7 +36,6 @@ afterEach(() => vi.restoreAllMocks());
 
 it("projects send policy and recipient restrictions, clearing them when the current role permits sending", async () => {
   await withOpenClawTestState({ scenario: "minimal" }, async () => {
-    using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
     const cfg = rolePolicyConfig();
     cfg.gateway!.roles!.definitions.write!.sandbox = "required";
     cfg.gateway!.roles!.definitions.restricted = {
@@ -50,10 +49,12 @@ it("projects send policy and recipient restrictions, clearing them when the curr
     const clients = ["write", "view", "suggest", "restricted"].map((role) => {
       const profile = ensureProfileForEmail(`${role}@send-presentation.test`);
       setUserProfileRole(profile.id, role);
-      const client = sharingPolicyClient({ user: profile.id });
-      prepareGatewayRecipientProfile(client);
-      return client;
+      return sharingPolicyClient({ user: profile.id });
     });
+    using _ = { [Symbol.dispose]: (await prepareUserProfileCatalog()).release };
+    for (const client of clients) {
+      prepareGatewayRecipientProfile(client);
+    }
     const creatorId = clients[0]!.authenticatedUserProfile!.profileId;
     const keys = ["host", "sandbox", "entry-blocked", "policy-blocked"];
     for (const key of keys) {

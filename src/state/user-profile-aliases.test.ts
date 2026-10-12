@@ -17,7 +17,11 @@ import {
   readUserProfileSnapshotSync,
   readUserProfileEmailBindings,
 } from "./user-profile-identity.read.js";
-import { prepareUserProfileCatalog, readUserProfileIdentity } from "./user-profile-list.js";
+import {
+  prepareUserProfileCatalog,
+  readUserProfileAliases,
+  readUserProfileIdentity,
+} from "./user-profile-list.js";
 import {
   linkEmail,
   setAvatar,
@@ -26,7 +30,7 @@ import {
 } from "./user-profile-writes.worker.js";
 import { ensureUserProfilesSchema } from "./user-profiles-schema.js";
 import { migrateLegacyTailscaleProfileIdentities } from "./user-profiles-tailscale-migration.js";
-import { ensureProfileForEmail, readUserProfileAliases } from "./user-profiles.js";
+import { ensureProfileForEmail } from "./user-profiles.js";
 
 const roots = createTempDirTracker();
 const statePaths: string[] = [];

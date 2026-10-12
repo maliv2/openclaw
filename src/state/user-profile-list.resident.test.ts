@@ -16,7 +16,6 @@ import { captureOpenClawStateWorkerContext } from "./openclaw-state-worker-conte
 import { fenceUserProfileMutationAuthority, onUserProfilesChanged } from "./user-profile-events.js";
 import {
   getUserProfileDisplay,
-  getUserProfileDisplays,
   hasMultipleSessionSharingIdentities,
   prepareUserProfileCatalog,
   prepareUserProfileIdentity,
@@ -67,7 +66,6 @@ describe("resident profile display and reference catalog", () => {
     expect(readUserProfileIdentity(profile.id, options)).toBeUndefined();
     expect(readUserProfileAliases(profile.id, options)).toEqual(new Set([profile.id]));
     expect(hasMultipleSessionSharingIdentities(options)).toBe(false);
-    expect(getUserProfileDisplays([profile.id], options)).toEqual(new Map());
     expect(() => getUserProfileDisplay(profile.id, options)).toThrow("user profile not found");
     expect(native).not.toHaveBeenCalled();
     expect(queries).not.toHaveBeenCalled();
@@ -78,9 +76,7 @@ describe("resident profile display and reference catalog", () => {
     queries.mockClear();
     setDisplayName(profile.id, "Current", options);
     queries.mockClear();
-    expect(getUserProfileDisplays([profile.id], options).get(profile.id)?.displayName).toBe(
-      "Current",
-    );
+    expect(getUserProfileDisplay(profile.id, options).displayName).toBe("Current");
     expect(queries).not.toHaveBeenCalled();
     expect(native).not.toHaveBeenCalled();
   });
@@ -353,7 +349,6 @@ describe("resident profile display and reference catalog", () => {
       if (!head.ok || !head.value) {
         throw new Error("missing merge head");
       }
-      const headProfileId = head.value;
       setDisplayName(first.id, "Current person", options);
       setUserProfileRole(first.id, "reader", options);
       expect(setAvatar(first.id, new Uint8Array([1, 2]), "image/png", options).ok).toBe(true);
@@ -373,9 +368,6 @@ describe("resident profile display and reference catalog", () => {
         expect(resolveUserProfileReference(id.replaceAll("-", ""), options)).toEqual(head);
         expect(readUserProfileAliases(id, options)).toContain(first.id);
       }
-      expect([
-        ...getUserProfileDisplays([first.id, second.id, head.value, "missing"], options).values(),
-      ]).toEqual(Array.from({ length: 3 }, () => getUserProfileDisplay(headProfileId, options)));
       expect(native).not.toHaveBeenCalled();
     },
   );

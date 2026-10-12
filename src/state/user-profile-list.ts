@@ -23,7 +23,6 @@ import {
 import { selectProfileAccessEntries } from "./user-profile-github-identity.js";
 import {
   profileCatalogPath,
-  projectUserProfileDisplays,
   projectHasMultipleSessionSharingIdentities,
   resolveUserProfileReferenceInCatalog,
 } from "./user-profile-identity.read.js";
@@ -639,22 +638,6 @@ export function getUserProfileDisplay(
     throw new UserProfileNotFoundError(profileId);
   }
   return projectUserProfileDisplay(profile);
-}
-
-/** Read a display cohort and its one-hop merge targets from the prepared catalog. */
-export function getUserProfileDisplays(
-  profileIds: readonly string[],
-  options: OpenClawStateDatabaseOptions = {},
-): Map<string, ReturnType<typeof getUserProfileDisplay>> {
-  const ids = [...new Set(profileIds)];
-  if (ids.length === 0) {
-    return new Map();
-  }
-  return (
-    readProfileCatalog(options, (resident) =>
-      projectUserProfileDisplays(ids, (id) => resolveCatalogProfile(resident, id)),
-    ) ?? new Map()
-  );
 }
 
 /** Activity references are display navigation, never authentication identifiers. */

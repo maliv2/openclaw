@@ -9,15 +9,11 @@ import {
 } from "./openclaw-state-db.js";
 import { readUserProfileAliasRevision } from "./user-profile-events.js";
 import { readUserProfileSnapshotSync } from "./user-profile-identity.read.js";
-import { prepareUserProfileCatalog } from "./user-profile-list.js";
+import { prepareUserProfileCatalog, readUserProfileAliases } from "./user-profile-list.js";
 import { syncGitHubIdentity } from "./user-profile-writes.worker.js";
 import { repairMergedGatewayOwnerProfile } from "./user-profiles-owner-migration.js";
 import { mergeOwnerIntoPerson, profileState } from "./user-profiles-owner.test-support.js";
-import {
-  ensureGatewayOwnerProfile,
-  ensureProfileForTailscaleIdentity,
-  readUserProfileAliases,
-} from "./user-profiles.js";
+import { ensureGatewayOwnerProfile, ensureProfileForTailscaleIdentity } from "./user-profiles.js";
 
 const catalogReleases: Array<() => void> = [];
 const tempDirs = useAutoCleanupTempDirTracker((cleanup) => {

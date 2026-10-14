@@ -260,12 +260,12 @@ describe("logging.redactPatterns", () => {
       {
         path: "logging.redactPatterns.1",
         message:
-          "Redaction pattern is ignored (invalid-regex); values it should mask stay visible in logs and diagnostics.",
+          "Redaction pattern is ignored (invalid-regex); values it should mask stay visible in logs and diagnostics. Fix the regex syntax, then run openclaw config validate again.",
       },
       {
         path: "logging.redactPatterns.2",
         message:
-          "Redaction pattern is ignored (unsafe-nested-repetition); values it should mask stay visible in logs and diagnostics.",
+          "Redaction pattern is ignored (unsafe-nested-repetition); values it should mask stay visible in logs and diagnostics. Rewrite the nested repetition, for example (a+)+ as a+, then run openclaw config validate again.",
       },
     ]);
   });

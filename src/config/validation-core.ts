@@ -85,9 +85,13 @@ export function collectRedactPatternWarnings(config: OpenClawConfig): ConfigVali
     }
     const compiled = compileConfigRegex(...parseRedactPatternSource(raw));
     if (compiled?.reason) {
+      const repair =
+        compiled.reason === "invalid-regex"
+          ? "Fix the regex syntax"
+          : "Rewrite the nested repetition, for example (a+)+ as a+";
       warnings.push({
         path: `logging.redactPatterns.${index}`,
-        message: `Redaction pattern is ignored (${compiled.reason}); values it should mask stay visible in logs and diagnostics.`,
+        message: `Redaction pattern is ignored (${compiled.reason}); values it should mask stay visible in logs and diagnostics. ${repair}, then run openclaw config validate again.`,
       });
     }
   });

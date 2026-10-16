@@ -74,6 +74,10 @@ const internalInputs = [
   ["exec-silent", silentExecPrompt],
   ["exec-silent-heartbeat-tool", silentHeartbeatToolExecPrompt],
   [
+    "exec-silent-with-scratch",
+    `${silentExecPrompt}\n\nHeartbeat monitor scratch:\ncheck disk usage`,
+  ],
+  [
     "exec-with-queued-system-event",
     `System: [2026-10-06 14:35:17 GMT+8] Control UI reaction added: 👍 by Alice on msg m1 from assistant\n\n${execPrompt}`,
   ],

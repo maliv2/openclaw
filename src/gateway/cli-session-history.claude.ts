@@ -378,7 +378,7 @@ function resolveClaudeCliInternalSourceTool(text: string): string | undefined {
     body.startsWith(
       "An async command completion event was triggered, but user delivery is disabled for this run. ",
     ) &&
-    body.endsWith(" Do not mention, summarize, or reuse command output.")
+    body.includes(" Do not mention, summarize, or reuse command output.")
   ) {
     return "exec";
   }

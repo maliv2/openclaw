@@ -1,9 +1,8 @@
 import { onCleanup } from "solid-js";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import { formatUiError, formatUiExternalText } from "../../lib/format-error.ts";
-import { projectSource } from "../../lib/reactive/projection.ts";
+import { projectMutableSource } from "../../lib/reactive/projection.ts";
 import type {
-  LogbookDaysPayload,
   LogbookStatusPayload,
   LogbookTimelinePayload,
   LogbookUiState,
@@ -24,12 +23,11 @@ export function shiftDay(day: string, deltaDays: number): string {
   return localDayKey(base);
 }
 
-export function createLogbook() {
+export function createLogbook(initialClient: GatewayBrowserClient | null) {
   // Request admission and selected-day custody must change before the next Solid flush.
   const state: LogbookUiState = {
     day: localDayKey(),
     status: null,
-    days: [],
     timeline: null,
     loading: false,
     error: null,
@@ -41,30 +39,25 @@ export function createLogbook() {
     askLoading: false,
     actionPending: false,
   };
-  let client: GatewayBrowserClient | null = null;
+  let client = initialClient;
   let dayPinned = false;
   let backgroundRefresh: Promise<void> | null = null;
   let backgroundRefreshQueued = false;
-  let pollTimer: ReturnType<typeof setInterval> | undefined;
-  let frameLoads = new Set<number>();
+  let dayLifetime = Promise.withResolvers<void>();
+  const frameLoads = new Set<number>();
   let notify = () => {};
-  const projection = projectSource(state, {
-    read: (source) => source,
-    subscribe: (_source, listener) => {
-      notify = listener;
-      return () => {
-        notify = () => {};
-      };
-    },
-    equality: "revision",
-  });
+  const projection = projectMutableSource(state, (source) => source);
+  notify = projection.publish;
   onCleanup(() => {
+    dayLifetime.resolve();
     clearInterval(pollTimer);
     client = null;
     backgroundRefreshQueued = false;
   });
 
   function resetDay(day: string) {
+    dayLifetime.resolve();
+    dayLifetime = Promise.withResolvers<void>();
     state.day = day;
     state.timeline = null;
     state.standup = null;
@@ -91,16 +84,14 @@ export function createLogbook() {
       notify();
     }
     try {
-      const [status, days, timeline] = await Promise.all([
+      const [status, timeline] = await Promise.all([
         current.request<LogbookStatusPayload>("logbook.status", {}),
-        current.request<LogbookDaysPayload>("logbook.days", {}),
         current.request<LogbookTimelinePayload>("logbook.timeline", { day: requestedDay }),
       ]);
       if (client !== current || state.day !== requestedDay) {
         return;
       }
       state.status = status;
-      state.days = days.days;
       // Follow the capture host's day until the user explicitly selects one.
       if (!dayPinned && status.today !== state.day) {
         resetDay(status.today);
@@ -147,64 +138,57 @@ export function createLogbook() {
     const refresh = load({ silent: true });
     backgroundRefresh = refresh;
     void refresh.finally(() => {
-      if (backgroundRefresh === refresh) {
-        backgroundRefresh = null;
-      }
+      backgroundRefresh = null;
       drainRefresh();
     });
     return refresh;
   }
 
-  async function runAction(
+  function runAction(
     pending: "actionPending" | "standupLoading" | "askLoading",
     run: (current: GatewayBrowserClient, isCurrent: () => boolean) => Promise<void>,
     settled?: () => void,
   ) {
     const current = client;
     if (!current || state[pending]) {
-      return;
+      return undefined;
     }
     const isCurrent = () => client === current;
     state[pending] = true;
     notify();
-    try {
-      await run(current, isCurrent);
-    } catch (error) {
-      if (isCurrent()) {
-        state.error = formatUiError(error);
+    return (async () => {
+      try {
+        await run(current, isCurrent);
+      } catch (error) {
+        if (isCurrent()) {
+          state.error = formatUiError(error);
+        }
+      } finally {
+        if (isCurrent()) {
+          state[pending] = false;
+          notify();
+          settled?.();
+        }
       }
-    } finally {
-      if (isCurrent()) {
-        state[pending] = false;
-        notify();
-        settled?.();
-      }
-    }
+    })();
   }
 
+  // PluginPage remounts this model for each connection; polling shares the analysis refresh owner.
+  const pollTimer = client
+    ? setInterval(() => void refreshSilently(), POLL_INTERVAL_MS)
+    : undefined;
   return {
+    get dayRetired() {
+      return dayLifetime.promise;
+    },
+    reportError(error: unknown) {
+      state.error = formatUiError(error);
+      notify();
+    },
     get state() {
       return projection.read();
     },
     load,
-    // Returns whether the connected source needs its initial load.
-    connect(next: GatewayBrowserClient | null): boolean {
-      if (client !== next) {
-        clearInterval(pollTimer);
-        client = next;
-        state.loading = false;
-        backgroundRefresh = null;
-        backgroundRefreshQueued = false;
-        state.actionPending = false;
-        state.standupLoading = false;
-        state.askLoading = false;
-        frameLoads = new Set();
-        // Polls and analysis completion share one background request owner.
-        pollTimer = next ? setInterval(() => void refreshSilently(), POLL_INTERVAL_MS) : undefined;
-        notify();
-      }
-      return next !== null && !state.timeline && !state.loading && !state.error;
-    },
     async loadFrame(frameId: number) {
       const current = client;
       if (
@@ -279,10 +263,10 @@ export function createLogbook() {
         }
       });
     },
-    async ask(input: string) {
+    ask(input: string) {
       const question = input.trim();
       if (!question) {
-        return;
+        return undefined;
       }
       return runAction("askLoading", async (current, isCurrent) => {
         state.askAnswer = null;

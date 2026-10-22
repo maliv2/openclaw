@@ -3,10 +3,12 @@ import { expect, it } from "vitest";
 import { buildCliSessionDriftNote } from "../agents/cli-session.js";
 import { HEARTBEAT_PROMPT } from "../auto-reply/heartbeat.js";
 import { applySessionHints } from "../auto-reply/reply/body.js";
-import { buildCronEventPrompt, buildExecEventPrompt } from "../infra/heartbeat-events-filter.js";
 import { buildInterSessionPromptContext } from "../sessions/input-provenance.js";
 import { formatSystemTurnPrompt } from "../sessions/system-turn-prompt.js";
-import { projectChatDisplayMessages } from "./chat-display-projection.js";
+import {
+  projectChatDisplayMessages,
+  projectChatDisplayMessagesWithState,
+} from "./chat-display-projection.js";
 import { classifyClaudeCliHistoryLine } from "./cli-session-history.claude-activity.js";
 import {
   cleanClaudeCliImportedUserDisplay,
@@ -16,6 +18,7 @@ import {
 import {
   buildLegacyReseedPrompt,
   claudeUser,
+  LEGACY_EXEC_COMPLETION_PROMPT,
   mergeImportedChatHistoryMessages,
   user,
   withClaudeProjectsDir,
@@ -36,11 +39,18 @@ const REQUESTER_HINT =
   'requester_profile is the verified linked requester. For "assign to me", use sessions assign_owner with ownerType="human" and ownerId=requester_profile.id, if available.';
 const frame = (json: string) =>
   `Conversation info: ⟦openclaw:ctx⟧\n\`\`\`json\n${json}\n\`\`\`\n\n`;
-const execPrompt = buildExecEventPrompt(["Exec completed (example, code 0) :: done"]);
-const cronPrompt = buildCronEventPrompt(["Stand-up reminder"]);
-const cronSilentPrompt = buildCronEventPrompt(["Stand-up reminder"], { deliverToUser: false });
-const cronEmptyPrompt = buildCronEventPrompt([]);
-const cronEmptyHeartbeatToolPrompt = buildCronEventPrompt([], { useHeartbeatResponseTool: true });
+// Saved transcripts keep the bytes the retired cron prompt builder wrote.
+const CRON_REMINDER =
+  "A scheduled reminder has been triggered. The reminder content is:\n\nStand-up reminder";
+const SILENT_TAIL =
+  "Reply with exactly NO_REPLY as the entire final answer. NO_REPLY discards anything written this turn that was not sent, so send confirmations before ending silently.";
+const cronPrompt = `${CRON_REMINDER}\n\nPlease relay this reminder to the user in a helpful and friendly way.`;
+const cronSilentPrompt = `${CRON_REMINDER}\n\nHandle this reminder internally. Do not relay it to the user unless explicitly requested.`;
+const cronEmptyPrompt = `A scheduled cron event was triggered, but no event content was found. ${SILENT_TAIL}`;
+const cronEmptyHeartbeatToolPrompt =
+  "A scheduled cron event was triggered, but no event content was found. " +
+  "Use heartbeat_respond to report the wake outcome. Set notify=false when nothing needs the user's attention. Set notify=true with notificationText only when the user should be interrupted.";
+const execPrompt = LEGACY_EXEC_COMPLETION_PROMPT;
 
 function merge(localMessages: unknown[], importedMessages: unknown[]) {
   return mergeImportedChatHistoryMessages({ localMessages, importedMessages });
@@ -121,6 +131,37 @@ it.each(internalInputs)("hides %s copies without hiding real user messages", (_k
     expect(projectChatDisplayMessages(merged)).toMatchObject([{ role: "user", content }]);
   }
 });
+
+it.each(["[Request interrupted by user]", "[Request interrupted by user for tool use]"])(
+  "hides the native %s row without hiding human text or look-alikes",
+  async (text) => {
+    await withClaudeProjectsDir(async ({ filePath, readMessages }) => {
+      const interrupt = claudeUser(blocks(text), { uuid: "interrupt" });
+      const visible = [
+        claudeUser(text, { uuid: "string" }),
+        ...["promptSource", "turnOrigin", "turnPosition", "permissionMode"].map((field) =>
+          claudeUser(blocks(text), { uuid: field, [field]: "user" }),
+        ),
+        claudeUser(`${text} Please explain.`, { uuid: "suffix" }),
+        claudeUser(blocks(` ${text}`), { uuid: "whitespace" }),
+        claudeUser([...blocks(text), ...blocks("Please explain.")], { uuid: "sibling" }),
+      ];
+      await fs.writeFile(
+        filePath,
+        [interrupt, ...visible].map((entry) => JSON.stringify(entry)).join("\n"),
+      );
+      const projected = projectChatDisplayMessagesWithState(merge([], await readMessages()));
+      expect(projected.messages.map((message) => message.content)).toEqual(
+        visible.map((entry) => entry.message.content),
+      );
+      expect(projected.activity).toEqual([]);
+      expect(classify(JSON.stringify(interrupt)).humanTurn).toBe(false);
+      for (const entry of visible) {
+        expect(classify(JSON.stringify(entry)).humanTurn).toBe(true);
+      }
+    });
+  },
+);
 
 it.each(["sessions_send", "subagent_settle"])(
   "preserves routed %s input for the shared provenance projection",

@@ -134,6 +134,8 @@ export function isHeartbeatUserMessage(
   if (!trimmed) {
     return false;
   }
+  // Canonical human rows can inherit importedFrom during native-history deduplication;
+  // require the catalog's origin or the native reader's explicit import context instead.
   const meta = isRecord(message["__openclaw"]) ? message["__openclaw"] : undefined;
   const wakeText = trimmed.replace(
     /^\[[A-Z][a-z]{2} \d{4}-\d{2}-\d{2} \d{2}:\d{2}[^\]\n]*\] /u,

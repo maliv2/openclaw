@@ -9,7 +9,7 @@ export type GenerationWorkerInput = (
       operation: "capture";
       captureId: number;
       rootDir: string;
-      entryFile?: string;
+      entryFile?: string | readonly string[];
       storage: PluginSourceCaptureStorage;
       installRoots: PluginInstallRoots;
       readOnly: boolean;
